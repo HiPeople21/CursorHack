@@ -1,0 +1,6 @@
+backend/.venv/
+backend/standing.db
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.env
+*.pyc

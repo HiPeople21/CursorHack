@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    font-family:
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      Roboto,
+      sans-serif;
+    background-color: #f6f5f2;
+    color: #1a1a1a;
+  }
+}
+
+@layer utilities {
+  .receipt-quote {
+    font-family: ui-monospace, Consolas, 'Courier New', monospace;
+  }
+}
