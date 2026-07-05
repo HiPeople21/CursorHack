@@ -180,4 +180,5 @@ export interface Session {
   result: DecodeResult | null;
   createdAt: string;
   updatedAt: string;
+  renamed?: boolean; // user set the title manually — don't auto-derive from text
 }

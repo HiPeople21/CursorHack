@@ -84,10 +84,38 @@ export function useSessions() {
 
   const setText = useCallback(
     (id: string, text: string) => {
-      patch(id, { text, title: titleFromText(text) });
+      // Keep a manually-renamed title; otherwise derive it from the text.
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === id
+            ? {
+                ...s,
+                text,
+                title: s.renamed ? s.title : titleFromText(text),
+                updatedAt: now(),
+              }
+            : s
+        )
+      );
     },
-    [patch]
+    []
   );
+
+  const rename = useCallback((id: string, title: string) => {
+    const clean = title.trim();
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id === id
+          ? {
+              ...s,
+              title: clean || titleFromText(s.text),
+              renamed: clean.length > 0,
+              updatedAt: now(),
+            }
+          : s
+      )
+    );
+  }, []);
 
   const setJurisdiction = useCallback(
     (id: string, jurisdiction: string) => patch(id, { jurisdiction }),
@@ -120,6 +148,7 @@ export function useSessions() {
     select: setActiveId,
     create,
     remove,
+    rename,
     setText,
     setJurisdiction,
     setResult,
