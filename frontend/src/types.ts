@@ -207,4 +207,5 @@ export interface Session {
   decoding?: boolean;
   createdAt: string;
   updatedAt: string;
+  renamed?: boolean; // user set the title manually — don't auto-derive from text
 }

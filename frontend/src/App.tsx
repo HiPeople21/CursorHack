@@ -17,6 +17,7 @@ function App() {
     select,
     create,
     remove,
+    rename,
     setText,
     setJurisdiction,
     setResult,
@@ -74,6 +75,7 @@ function App() {
         onSelect={select}
         onCreate={create}
         onDelete={remove}
+        onRename={rename}
         onOpenProfile={() => setProfileOpen(true)}
         profileName={profile?.full_name ?? null}
         loadingIds={loadingIds}
@@ -92,19 +94,25 @@ function App() {
           </div>
         )}
 
-        <header className="sticky top-0 z-10 border-b border-stone-200 bg-surface/90 backdrop-blur">
-          <div className="mx-auto max-w-3xl px-4 py-4 sm:px-6">
-            <h1 className="text-lg font-bold tracking-tight text-stone-900">
-              {active?.title || 'New document'}
-            </h1>
-            <p className="mt-0.5 text-sm text-stone-500">
-              Paste an official letter. We check whether it's even lawful, cite
-              every claim to a source, and draft your response.
-            </p>
-          </div>
-        </header>
-
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
+          <div className="mb-4 flex items-center gap-1.5 text-sm font-medium text-stone-500">
+            <svg
+              className="h-3.5 w-3.5 shrink-0 text-stone-400"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              aria-hidden
+            >
+              <path
+                d="M5 3h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"
+                strokeLinejoin="round"
+              />
+              <path d="M11 3v4h4" strokeLinejoin="round" />
+            </svg>
+            <span className="truncate">{active?.title || 'New document'}</span>
+          </div>
+
           {active && (
             <PasteBox
               key={active.id}
@@ -133,7 +141,7 @@ function App() {
           <footer className="mt-10 border-t border-stone-200 pt-4 pb-2">
             <p className="text-xs leading-relaxed text-stone-400">
               {result?.disclaimer ??
-                'Information, not legal advice. Standing cites the sources it uses so you can verify them yourself.'}
+                'Information, not legal advice. reywal cites the sources it uses so you can verify them yourself.'}
             </p>
           </footer>
         </main>

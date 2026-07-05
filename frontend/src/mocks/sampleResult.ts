@@ -169,6 +169,6 @@ export const sampleResult: DecodeResult = {
     },
   ],
   disclaimer:
-    'This is information, not legal advice. Standing cites the sources it used above so you can ' +
+    'This is information, not legal advice. reywal cites the sources it used above so you can ' +
     'verify them yourself; for advice specific to your situation, contact Threshold or a solicitor.',
 };

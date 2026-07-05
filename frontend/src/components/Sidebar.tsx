@@ -1,4 +1,6 @@
+import { useEffect, useRef, useState } from 'react';
 import type { Session } from '../types';
+import Logo from './Logo';
 
 interface SidebarProps {
   sessions: Session[];
@@ -6,11 +8,18 @@ interface SidebarProps {
   onSelect: (id: string) => void;
   onCreate: () => void;
   onDelete: (id: string) => void;
+  onRename: (id: string, title: string) => void;
   onOpenProfile: () => void;
   profileName: string | null;
   loadingIds: string[];
   isGhost: boolean;
   onToggleTheme: () => void;
+}
+
+interface ContextMenu {
+  id: string;
+  x: number;
+  y: number;
 }
 
 function verdictDot(session: Session): string {
@@ -28,6 +37,7 @@ export default function Sidebar({
   onSelect,
   onCreate,
   onDelete,
+  onRename,
   onOpenProfile,
   profileName,
   loadingIds,
@@ -35,19 +45,56 @@ export default function Sidebar({
   onToggleTheme,
 }: SidebarProps) {
   const loadingSet = new Set(loadingIds);
+  const [menu, setMenu] = useState<ContextMenu | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Close the context menu on any outside click, scroll, or Escape.
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenu(null);
+    window.addEventListener('click', close);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [menu]);
+
+  // Focus the input when a row enters rename mode.
+  useEffect(() => {
+    if (editingId) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editingId]);
+
+  function openMenu(e: React.MouseEvent, id: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenu({ id, x: e.clientX, y: e.clientY });
+  }
+
+  function startRename(session: Session) {
+    setMenu(null);
+    setEditingId(session.id);
+    setDraft(session.title);
+  }
+
+  function commitRename() {
+    if (editingId) onRename(editingId, draft);
+    setEditingId(null);
+  }
+
   return (
     <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-stone-200 bg-surface">
       {/* Brand */}
-      <div className="flex items-center gap-2 px-4 py-4">
-        <span
-          aria-hidden
-          className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-black text-white"
-        >
-          S
-        </span>
-        <span className="text-lg font-black tracking-tight text-stone-900">
-          Standing
-        </span>
+      <div className="px-4 py-4">
+        <Logo size="sm" />
       </div>
 
       {/* New document */}
@@ -83,6 +130,7 @@ export default function Sidebar({
             return (
               <li key={s.id}>
                 <div
+                  onContextMenu={(e) => openMenu(e, s.id)}
                   className={`group flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition ${
                     isActive
                       ? 'bg-indigo-50 text-indigo-900'
@@ -101,14 +149,30 @@ export default function Sidebar({
                       className={`h-2 w-2 shrink-0 rounded-full ${verdictDot(s)}`}
                     />
                   )}
-                  <button
-                    type="button"
-                    onClick={() => onSelect(s.id)}
-                    className="min-w-0 flex-1 truncate text-left"
-                    title={s.title}
-                  >
-                    {s.title || 'New document'}
-                  </button>
+                  {editingId === s.id ? (
+                    <input
+                      ref={inputRef}
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onBlur={commitRename}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitRename();
+                        if (e.key === 'Escape') setEditingId(null);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="min-w-0 flex-1 rounded border border-indigo-400 bg-surface px-1.5 py-0.5 text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onSelect(s.id)}
+                      onDoubleClick={() => startRename(s)}
+                      className="min-w-0 flex-1 truncate text-left"
+                      title={s.title}
+                    >
+                      {s.title || 'New document'}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={(e) => {
@@ -237,6 +301,64 @@ export default function Sidebar({
           </svg>
         </button>
       </div>
+
+      {/* Right-click context menu */}
+      {menu && (
+        <div
+          className="animate-overlay-in fixed z-50 w-40 overflow-hidden rounded-lg border border-stone-200 bg-surface py-1 shadow-lg"
+          style={{ top: menu.y, left: menu.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              const s = sessions.find((x) => x.id === menu.id);
+              if (s) startRename(s);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-stone-700 hover:bg-stone-100"
+          >
+            <svg
+              className="h-3.5 w-3.5 text-stone-400"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              aria-hidden
+            >
+              <path
+                d="M13 4l3 3-8 8H5v-3l8-8Z"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Rename
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onDelete(menu.id);
+              setMenu(null);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              aria-hidden
+            >
+              <path
+                d="M4 6h12M8 6V4h4v2m1 0-.5 10h-5L7 6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Delete
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

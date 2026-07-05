@@ -37,6 +37,10 @@
   --c-indigo-950: 16 26 46;
 
   --c-surface: 255 255 255; /* cards / inputs */
+
+  /* Shimmer sweep for the thinking buzzword. */
+  --sh-base: 107 120 160;
+  --sh-hi: 51 73 122;
 }
 
 html.ghost {
@@ -67,6 +71,9 @@ html.ghost {
   --c-indigo-950: 200 215 250;
 
   --c-surface: 19 26 48; /* elevated navy card */
+
+  --sh-base: 150 162 195;
+  --sh-hi: 220 228 255;
 }
 
 @layer base {
@@ -78,6 +85,7 @@ html.ghost {
   body {
     margin: 0;
     font-family:
+      'IBM Plex Sans',
       system-ui,
       -apple-system,
       'Segoe UI',
@@ -85,6 +93,14 @@ html.ghost {
       sans-serif;
     background-color: rgb(var(--c-stone-100));
     color: rgb(var(--c-stone-900));
+  }
+
+  .font-display {
+    font-family: 'Fraunces', Georgia, serif;
+  }
+
+  .font-brand {
+    font-family: 'Montserrat', 'IBM Plex Sans', system-ui, sans-serif;
   }
 }
 
@@ -142,5 +158,135 @@ html.ghost {
 
   .receipt-quote {
     font-family: ui-monospace, Consolas, 'Courier New', monospace;
+  }
+
+  .animate-fade-up {
+    animation: fadeUp 0.7s ease-out both;
+  }
+
+  .animate-fade-up-delay {
+    animation: fadeUp 0.7s ease-out 0.15s both;
+  }
+
+}
+
+/* --- Ghost spinner + thinking line + drop-zone animations --- */
+@keyframes ghost-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(3deg);
+  }
+}
+@keyframes ghost-glow {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scaleX(1);
+  }
+  50% {
+    opacity: 0.12;
+    transform: scaleX(0.6);
+  }
+}
+@keyframes ghost-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes thinking-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+@keyframes word-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes plop {
+  0% {
+    transform: scale(0.975);
+  }
+  55% {
+    transform: scale(1.012);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@layer utilities {
+  .animate-ghost-bob {
+    animation: ghost-bob 2.4s ease-in-out infinite;
+    transform-origin: center;
+  }
+  .animate-ghost-glow {
+    animation: ghost-glow 2.4s ease-in-out infinite;
+  }
+  .animate-ghost-blink {
+    animation: ghost-blink 3.6s ease-in-out infinite;
+    transform-origin: center;
+  }
+  .animate-plop {
+    animation: plop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .animate-overlay-in {
+    animation: overlay-in 0.18s ease-out;
+  }
+  .animate-word-in {
+    animation: word-in 0.35s ease-out;
+  }
+
+  /* Shimmering buzzword: a highlight sweeps across the text. */
+  .thinking-word {
+    background-image: linear-gradient(
+      90deg,
+      rgb(var(--sh-base)) 0%,
+      rgb(var(--sh-base)) 40%,
+      rgb(var(--sh-hi)) 50%,
+      rgb(var(--sh-base)) 60%,
+      rgb(var(--sh-base)) 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: thinking-shimmer 1.6s linear infinite;
   }
 }

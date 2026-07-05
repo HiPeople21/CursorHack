@@ -1,4 +1,5 @@
 import type { DecodeProgressEvent, DecodeStage } from '../types';
+import GhostSpinner from './GhostSpinner';
 
 interface ThinkingPanelProps {
   events: DecodeProgressEvent[];
@@ -34,19 +35,25 @@ export default function ThinkingPanel({ events, active }: ThinkingPanelProps) {
 
   return (
     <div className="mt-6 overflow-hidden rounded-2xl border border-indigo-200 bg-indigo-50/60">
-      <div className="flex items-center gap-2 border-b border-indigo-100 px-5 py-3">
+      <div className="flex items-center gap-2.5 border-b border-indigo-100 px-5 py-3">
         {active ? (
+          <GhostSpinner className="h-6 w-6" />
+        ) : (
           <span
             aria-hidden
-            className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-indigo-300 border-t-indigo-600"
-          />
-        ) : (
-          <span aria-hidden className="text-indigo-600">
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white"
+          >
             ✓
           </span>
         )}
-        <span className="text-sm font-semibold text-indigo-900">
-          {active ? 'Working through your document…' : 'Analysis complete'}
+        <span
+          className={
+            active
+              ? 'thinking-word text-sm font-bold tracking-wide'
+              : 'text-sm font-semibold text-indigo-900'
+          }
+        >
+          {active ? 'Thinking through your document' : 'Analysis complete'}
         </span>
       </div>
 
@@ -90,7 +97,9 @@ export default function ThinkingPanel({ events, active }: ThinkingPanelProps) {
                   className={
                     state === 'pending'
                       ? 'text-sm text-stone-400'
-                      : 'text-sm font-medium text-stone-800'
+                      : state === 'running'
+                        ? 'thinking-word text-sm font-bold tracking-wide'
+                        : 'text-sm font-medium text-stone-800'
                   }
                 >
                   {label}
