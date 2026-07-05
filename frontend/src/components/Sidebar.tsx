@@ -8,6 +8,7 @@ interface SidebarProps {
   onDelete: (id: string) => void;
   onOpenProfile: () => void;
   profileName: string | null;
+  loadingIds: string[];
   isGhost: boolean;
   onToggleTheme: () => void;
 }
@@ -29,9 +30,11 @@ export default function Sidebar({
   onDelete,
   onOpenProfile,
   profileName,
+  loadingIds,
   isGhost,
   onToggleTheme,
 }: SidebarProps) {
+  const loadingSet = new Set(loadingIds);
   return (
     <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-stone-200 bg-surface">
       {/* Brand */}
@@ -76,6 +79,7 @@ export default function Sidebar({
         <ul className="space-y-0.5">
           {sessions.map((s) => {
             const isActive = s.id === activeId;
+            const isLoading = loadingSet.has(s.id);
             return (
               <li key={s.id}>
                 <div
@@ -85,10 +89,18 @@ export default function Sidebar({
                       : 'text-stone-600 hover:bg-stone-100'
                   }`}
                 >
-                  <span
-                    aria-hidden
-                    className={`h-2 w-2 shrink-0 rounded-full ${verdictDot(s)}`}
-                  />
+                  {isLoading ? (
+                    <span
+                      aria-hidden
+                      title="Decoding…"
+                      className="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-indigo-300 border-t-indigo-600"
+                    />
+                  ) : (
+                    <span
+                      aria-hidden
+                      className={`h-2 w-2 shrink-0 rounded-full ${verdictDot(s)}`}
+                    />
+                  )}
                   <button
                     type="button"
                     onClick={() => onSelect(s.id)}

@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar';
 import ProfilePanel, { PROFILE_ID_KEY } from './components/ProfilePanel';
 import { getHealth, getProfile } from './api/client';
 import { useSessions } from './hooks/useSessions';
+import { useDecodeRuns } from './hooks/useDecodeRuns';
 import { useTheme } from './hooks/useTheme';
 
 function App() {
@@ -20,6 +21,8 @@ function App() {
     setJurisdiction,
     setResult,
   } = useSessions();
+
+  const { getRun, startDecode, loadingIds } = useDecodeRuns(setResult);
 
   const { isGhost, toggle: toggleTheme } = useTheme();
   const [profileOpen, setProfileOpen] = useState(false);
@@ -58,6 +61,7 @@ function App() {
         onDelete={remove}
         onOpenProfile={() => setProfileOpen(true)}
         profileName={profile?.full_name ?? null}
+        loadingIds={loadingIds}
         isGhost={isGhost}
         onToggleTheme={toggleTheme}
       />
@@ -91,9 +95,17 @@ function App() {
               key={active.id}
               text={active.text}
               jurisdiction={active.jurisdiction}
+              run={getRun(active.id)}
               onTextChange={(t) => setText(active.id, t)}
               onJurisdictionChange={(j) => setJurisdiction(active.id, j)}
-              onResult={(r) => setResult(active.id, r)}
+              onDecode={(institution) =>
+                startDecode(
+                  active.id,
+                  active.text,
+                  active.jurisdiction || undefined,
+                  institution
+                )
+              }
             />
           )}
 
