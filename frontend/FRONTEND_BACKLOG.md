@@ -21,11 +21,12 @@ This document tracks backend capabilities that are **fully or partially implemen
 |------|---------|----------|-----|
 | Core decode (`POST /api/decode`) | ✅ | ✅ | — |
 | Result display (summary, facts, verification, claims, actions) | ✅ | ✅ | Minor polish only |
-| Document history | ✅ | ❌ | List + reopen past decodes |
-| User profile CRUD | ✅ | ❌ | Settings form + localStorage id |
+| `needs_institution` prompt flow (`DecodeResponse`) | ✅ | ✅ | Suggestions + free-text re-submit |
+| Document history | ✅ | 🔶 | Client fns added; sidebar uses localStorage sessions |
+| User profile CRUD | ✅ | ✅ | Modal: create/edit/delete, PPS masked |
 | Profile autofill in generated letters | 🔧 | ❌ | Blocked on backend wiring |
-| Jurisdiction selector (GB) | ✅ | 🔶 | Only IE in dropdown |
-| Health / demo-mode indicator | ✅ | ❌ | Optional banner |
+| Jurisdiction selector (GB) | ✅ | ✅ | IE + GB in dropdown |
+| Health / demo-mode indicator | ✅ | ✅ | Banner shows when `demo_mode` |
 | Identified institutions in results | 🔧 | ❌ | Not exposed in API schema |
 | Third-level institution detection | 🔧 | ❌ | Module exists; not in pipeline |
 | TLS / HTTPS dev setup | ✅ | 🔶 | Vite proxy is HTTP-only |

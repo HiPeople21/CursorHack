@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import type { UserProfile } from './types';
+import type { HealthStatus, UserProfile } from './types';
 import PasteBox from './components/PasteBox';
 import ResultView from './components/ResultView';
 import Sidebar from './components/Sidebar';
 import ProfilePanel, { PROFILE_ID_KEY } from './components/ProfilePanel';
-import { getProfile } from './api/client';
+import { getHealth, getProfile } from './api/client';
 import { useSessions } from './hooks/useSessions';
 
 function App() {
@@ -22,6 +22,7 @@ function App() {
 
   const [profileOpen, setProfileOpen] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [health, setHealth] = useState<HealthStatus | null>(null);
 
   // Restore the saved profile name for the sidebar footer on load.
   useEffect(() => {
@@ -34,6 +35,13 @@ function App() {
       .catch(() => {
         /* offline / not found — sidebar just shows "Set up profile" */
       });
+  }, []);
+
+  // Environment/demo indicator.
+  useEffect(() => {
+    getHealth()
+      .then(setHealth)
+      .catch(() => setHealth(null));
   }, []);
 
   const result = active?.result ?? null;
@@ -51,6 +59,16 @@ function App() {
       />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+        {health?.demo_mode && (
+          <div className="flex items-center justify-center gap-2 bg-indigo-800 px-4 py-1.5 text-center text-xs font-medium text-indigo-50">
+            <span
+              aria-hidden
+              className="inline-block h-1.5 w-1.5 rounded-full bg-indigo-300"
+            />
+            Demo mode — using fixture data, live search is disabled.
+          </div>
+        )}
+
         <header className="sticky top-0 z-10 border-b border-stone-200 bg-white/90 backdrop-blur">
           <div className="mx-auto max-w-3xl px-4 py-4 sm:px-6">
             <h1 className="text-lg font-bold tracking-tight text-stone-900">
@@ -94,6 +112,7 @@ function App() {
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
         onSaved={setProfile}
+        onDeleted={() => setProfile(null)}
       />
     </div>
   );

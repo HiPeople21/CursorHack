@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import type { DecodeResult } from '../types';
+import type {
+  DecodeResult,
+  InstitutionPrompt,
+  UserProvidedInstitution,
+} from '../types';
 import { decode } from '../api/client';
 
 interface PasteBoxProps {
@@ -24,6 +28,11 @@ within 14 days of this notice.
 
 Date of this notice: 21 June 2026`;
 
+const JURISDICTIONS = [
+  { value: 'IE', label: 'Ireland (IE)' },
+  { value: 'GB', label: 'United Kingdom (GB)' },
+];
+
 export default function PasteBox({
   text,
   jurisdiction,
@@ -33,20 +42,35 @@ export default function PasteBox({
 }: PasteBoxProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState<InstitutionPrompt | null>(null);
+  const [institutionText, setInstitutionText] = useState('');
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function submit(institution?: UserProvidedInstitution | null) {
     if (!text.trim() || loading) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await decode(text, jurisdiction);
-      onResult(result);
+      const response = await decode(text, jurisdiction, institution);
+      if (response.status === 'needs_institution') {
+        setPrompt(response.institution_prompt);
+        return;
+      }
+      if (response.result) {
+        setPrompt(null);
+        setInstitutionText('');
+        onResult(response.result);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setPrompt(null);
+    void submit();
   }
 
   return (
@@ -87,7 +111,11 @@ export default function PasteBox({
             onChange={(e) => onJurisdictionChange(e.target.value)}
             className="rounded-md border border-stone-300 bg-white px-2 py-1 text-xs font-medium text-stone-700"
           >
-            <option value="IE">Ireland (IE)</option>
+            {JURISDICTIONS.map((j) => (
+              <option key={j.value} value={j.value}>
+                {j.label}
+              </option>
+            ))}
           </select>
           <button
             type="button"
@@ -112,6 +140,48 @@ export default function PasteBox({
           {loading ? 'Checking against the rules...' : 'Decode this document'}
         </button>
       </div>
+
+      {prompt && (
+        <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-900">
+            {prompt.message}
+          </p>
+          {prompt.suggestions.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {prompt.suggestions.map((s) => (
+                <button
+                  key={s.body_id}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => void submit({ body_id: s.body_id })}
+                  className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
+                >
+                  {s.display_name}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <input
+              type="text"
+              value={institutionText}
+              onChange={(e) => setInstitutionText(e.target.value)}
+              placeholder="Or type the authority's name (e.g. Residential Tenancies Board)"
+              className="min-w-0 flex-1 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-stone-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            />
+            <button
+              type="button"
+              disabled={loading || institutionText.trim() === ''}
+              onClick={() =>
+                void submit({ display_name: institutionText.trim() })
+              }
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-stone-300"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">

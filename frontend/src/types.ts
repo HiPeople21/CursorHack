@@ -61,9 +61,41 @@ export interface DecodeResult {
   disclaimer: string;
 }
 
+export interface UserProvidedInstitution {
+  body_id?: string | null; // registry slug, e.g. "rtb" or "IE:rtb"
+  display_name?: string | null; // free text when slug is unknown
+}
+
 export interface DecodeRequest {
   text: string;
   jurisdiction?: string; // defaults to "IE"
+  institution?: UserProvidedInstitution | null;
+}
+
+export interface InstitutionSuggestion {
+  body_id: string;
+  display_name: string;
+}
+
+export interface InstitutionPrompt {
+  message: string;
+  field: string; // defaults to "institution"
+  suggestions: InstitutionSuggestion[];
+}
+
+// POST /api/decode now returns this wrapper, not a bare DecodeResult.
+export interface DecodeResponse {
+  status: 'complete' | 'needs_institution';
+  institution_prompt: InstitutionPrompt | null;
+  result: DecodeResult | null;
+}
+
+// GET /api/health
+export interface HealthStatus {
+  status: string;
+  demo_mode: boolean;
+  tls_enabled: boolean;
+  profile_encryption: boolean;
 }
 
 // --- Profile (autofill) — mirrors UserProfile in schemas.py ---

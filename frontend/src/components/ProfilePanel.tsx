@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { UserProfile, UserProfileInput } from '../types';
-import { createProfile, getProfile, updateProfile } from '../api/client';
+import {
+  createProfile,
+  deleteProfile,
+  getProfile,
+  updateProfile,
+} from '../api/client';
 
 const PROFILE_ID_KEY = 'standing.profileId.v1';
 
@@ -9,6 +14,7 @@ interface ProfilePanelProps {
   open: boolean;
   onClose: () => void;
   onSaved: (profile: UserProfile) => void;
+  onDeleted: () => void;
 }
 
 type FormState = {
@@ -76,6 +82,7 @@ function Field({
   type = 'text',
   placeholder,
   className = '',
+  secret = false,
 }: {
   label: string;
   value: string;
@@ -83,19 +90,35 @@ function Field({
   type?: string;
   placeholder?: string;
   className?: string;
+  secret?: boolean;
 }) {
+  const [revealed, setRevealed] = useState(false);
+  const inputType = secret && !revealed ? 'password' : type;
   return (
     <label className={`block ${className}`}>
       <span className="mb-1 block text-xs font-semibold text-stone-600">
         {label}
       </span>
-      <input
-        type={type}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-800 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-      />
+      <div className="relative">
+        <input
+          type={inputType}
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          className={`w-full rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-800 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 ${
+            secret ? 'pr-14' : ''
+          }`}
+        />
+        {secret && (
+          <button
+            type="button"
+            onClick={() => setRevealed((r) => !r)}
+            className="absolute inset-y-0 right-2 my-auto h-fit text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+          >
+            {revealed ? 'Hide' : 'Show'}
+          </button>
+        )}
+      </div>
     </label>
   );
 }
@@ -104,18 +127,21 @@ export default function ProfilePanel({
   open,
   onClose,
   onSaved,
+  onDeleted,
 }: ProfilePanelProps) {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // Load existing profile whenever the panel opens.
   useEffect(() => {
     if (!open) return;
     const id = localStorage.getItem(PROFILE_ID_KEY);
     setError(null);
+    setConfirmingDelete(false);
     if (!id) {
       setProfileId(null);
       setForm(EMPTY);
@@ -155,6 +181,25 @@ export default function ProfilePanel({
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save profile.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!profileId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await deleteProfile(profileId);
+      localStorage.removeItem(PROFILE_ID_KEY);
+      setProfileId(null);
+      setForm(EMPTY);
+      setConfirmingDelete(false);
+      onDeleted();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete profile.');
     } finally {
       setSaving(false);
     }
@@ -272,6 +317,7 @@ export default function ProfilePanel({
                 onChange={(v) => set('pps_number', v)}
                 placeholder="1234567AB"
                 className="col-span-2"
+                secret
               />
             </div>
           )}
@@ -284,6 +330,37 @@ export default function ProfilePanel({
         </form>
 
         <div className="flex items-center justify-end gap-2 border-t border-stone-200 px-6 py-4">
+          {profileId &&
+            (confirmingDelete ? (
+              <div className="mr-auto flex items-center gap-2">
+                <span className="text-xs font-medium text-stone-500">
+                  Delete profile?
+                </span>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={saving}
+                  className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  Yes, delete
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(false)}
+                  className="rounded-lg px-2 py-1.5 text-xs font-semibold text-stone-500 hover:bg-stone-100"
+                >
+                  No
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(true)}
+                className="mr-auto rounded-lg px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
+              >
+                Delete
+              </button>
+            ))}
           <button
             type="button"
             onClick={onClose}
