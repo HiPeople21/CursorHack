@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DragEvent, FormEvent } from 'react';
 import type {
+  DecodeProgressEvent,
   DecodeResult,
   InstitutionPrompt,
   UserProvidedInstitution,
 } from '../types';
-import { decode } from '../api/client';
-import ThinkingLine from './ThinkingLine';
+import { decodeStream } from '../api/client';
+import ThinkingPanel from './ThinkingPanel';
 
 interface Attachment {
   id: string;
@@ -59,6 +60,7 @@ export default function PasteBox({
   const [error, setError] = useState<string | null>(null);
   const [prompt, setPrompt] = useState<InstitutionPrompt | null>(null);
   const [institutionText, setInstitutionText] = useState('');
+  const [events, setEvents] = useState<DecodeProgressEvent[]>([]);
   const [dragging, setDragging] = useState(false);
   const [dropped, setDropped] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -157,8 +159,14 @@ export default function PasteBox({
     if (!text.trim() || loading) return;
     setLoading(true);
     setError(null);
+    setEvents([]);
     try {
-      const response = await decode(text, jurisdiction || undefined, institution);
+      const response = await decodeStream(
+        text,
+        (event) => setEvents((prev) => [...prev, event]),
+        jurisdiction || undefined,
+        institution
+      );
       if (response.status === 'needs_institution') {
         setPrompt(response.institution_prompt);
         return;
@@ -389,7 +397,7 @@ export default function PasteBox({
         </button>
       </div>
 
-      {loading && <ThinkingLine />}
+      {events.length > 0 && <ThinkingPanel events={events} active={loading} />}
 
       {prompt && (
         <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4">

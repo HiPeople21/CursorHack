@@ -92,6 +92,30 @@ export interface DecodeResponse {
   lawyer_referral_reason?: string;
 }
 
+// --- Streaming decode progress (POST /api/decode/stream, SSE) ---
+
+// Mirrors the pipeline stages in backend/app/pipeline/run.py, plus the two
+// terminal stages that carry a DecodeResponse.
+export type DecodeStage =
+  | 'classify'
+  | 'identify'
+  | 'extract'
+  | 'retrieve'
+  | 'ground'
+  | 'verify'
+  | 'act'
+  | 'refer'
+  | 'complete'
+  | 'needs_institution';
+
+export interface DecodeProgressEvent {
+  stage: DecodeStage;
+  status: 'running' | 'done';
+  label?: string; // present on "running" events — what the AI is doing now
+  detail?: string; // present on "done" events — the result of the stage
+  response?: DecodeResponse; // present only on terminal (complete/needs_institution) events
+}
+
 // --- Lawyer referrals (standalone endpoint — not on DecodeResult) ---
 
 export interface LawyerReferral {
