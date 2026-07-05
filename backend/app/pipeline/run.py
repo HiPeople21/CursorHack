@@ -1,103 +1,103 @@
-"""Pipeline entry point.
-
-Chains the six stages (classify -> extract -> retrieve -> ground -> verify ->
-act) plus a small summarize helper into one DecodeResult. Every stage is
-individually try/excepted: a failure in any single stage degrades that part
-of the result to an empty/safe value rather than raising, so `run_decode`
-always returns a schema-valid (if partial) DecodeResult.
-
-Signature is frozen per CLAUDE.md: run_decode(text, jurisdiction) -> DecodeResult
-"""
-
-from __future__ import annotations
+"""Pipeline entry point — chains classify → identify → extract → retrieve → ground → verify → act."""
 
 import logging
 import uuid
 
-from app.pipeline import act as act_stage
-from app.pipeline import classify as classify_stage
-from app.pipeline import extract as extract_stage
-from app.pipeline import ground as ground_stage
-from app.pipeline import retrieve as retrieve_stage
-from app.pipeline import summarize as summarize_stage
-from app.pipeline import verify as verify_stage
-from app.schemas import (
-    Action,
-    Claim,
-    DecodeResult,
-    ExtractedFact,
-    Verification,
+from app.pipeline.act import act
+from app.pipeline.classify import classify
+from app.pipeline.extract import extract
+from app.pipeline.ground import ground
+from app.pipeline.identify import identify_bodies
+from app.pipeline.institution_resolve import (
+    build_institution_prompt,
+    institution_from_user_input,
 )
+from app.pipeline.retrieve import retrieve
+from app.pipeline.verify import verify
+from app.schemas import DecodeResponse, DecodeResult, UserProvidedInstitution
 
 logger = logging.getLogger(__name__)
 
 DISCLAIMER = "Information, not legal advice."
 
 
-def run_decode(text: str, jurisdiction: str = "IE") -> DecodeResult:
-    """Run the full six-stage decode pipeline.
-
-    Resilient by design: each stage is isolated in its own try/except so a
-    failure anywhere (bad model output, network error, empty search results)
-    degrades that piece of the result to empty/safe defaults instead of
-    aborting the whole request. The endpoint always gets back a schema-valid
-    DecodeResult.
-    """
-    result_id = str(uuid.uuid4())
-    juris = (jurisdiction or "IE").strip() or "IE"
-
+def run_decode(
+    text: str,
+    jurisdiction: str = "IE",
+    institution: UserProvidedInstitution | None = None,
+) -> DecodeResponse:
+    """Run the decode pipeline with graceful degradation per stage."""
     doc_type = "other"
-    try:
-        doc_type, juris = classify_stage.classify(text, default_jurisdiction=juris)
-    except Exception:
-        logger.exception("classify stage failed; defaulting doc_type=other")
+    resolved_jurisdiction = jurisdiction or "IE"
+    bodies = []
+    facts = []
+    plain_summary = "Document received for analysis."
+    claims = []
+    verifications = []
+    actions = []
 
-    facts: list[ExtractedFact] = []
     try:
-        facts = extract_stage.extract(text, doc_type)
+        doc_type, resolved_jurisdiction = classify(text, resolved_jurisdiction)
     except Exception:
-        logger.exception("extract stage failed; continuing with no facts")
+        logger.exception("classify failed")
 
-    urls: list[dict[str, str]] = []
     try:
-        urls = retrieve_stage.retrieve(doc_type, facts, juris)
+        bodies = identify_bodies(text, doc_type, resolved_jurisdiction)
     except Exception:
-        logger.exception("retrieve stage failed; continuing with no candidate URLs")
+        logger.exception("identify_bodies failed")
 
-    passages: list[dict[str, str]] = []
+    if not bodies:
+        if institution is None:
+            return DecodeResponse(
+                status="needs_institution",
+                institution_prompt=build_institution_prompt(doc_type, resolved_jurisdiction),
+            )
+        try:
+            bodies = [institution_from_user_input(institution, resolved_jurisdiction)]
+        except ValueError:
+            return DecodeResponse(
+                status="needs_institution",
+                institution_prompt=build_institution_prompt(doc_type, resolved_jurisdiction),
+            )
+
     try:
-        passages = ground_stage.ground(urls)
+        facts, plain_summary = extract(text, doc_type)
     except Exception:
-        logger.exception("ground stage failed; continuing with no grounded passages")
+        logger.exception("extract failed")
 
-    claims: list[Claim] = []
-    verifications: list[Verification] = []
+    urls: list[str] = []
     try:
-        claims, verifications = verify_stage.verify(doc_type, facts, passages)
+        urls = retrieve(bodies, doc_type, facts, resolved_jurisdiction)
     except Exception:
-        logger.exception("verify stage failed; continuing with no claims/verifications")
+        logger.exception("retrieve failed")
 
-    actions: list[Action] = []
+    passages = []
     try:
-        actions = act_stage.act(doc_type, facts, verifications, juris)
+        passages = ground(urls, bodies=bodies, jurisdiction=resolved_jurisdiction)
     except Exception:
-        logger.exception("act stage failed; continuing with no actions")
+        logger.exception("ground failed")
 
-    plain_summary = ""
     try:
-        plain_summary = summarize_stage.summarize(text, doc_type, facts)
+        claims, verifications = verify(facts, passages)
     except Exception:
-        logger.exception("summarize helper failed; using generic summary")
-        plain_summary = "We could not automatically generate a plain-language summary for this document."
+        logger.exception("verify failed")
 
-    return DecodeResult(
-        id=result_id,
-        doc_type=doc_type,
-        jurisdiction=juris,
-        plain_summary=plain_summary,
-        extracted_facts=facts,
-        claims=claims,
-        verification=verifications,
-        actions=actions,
-        disclaimer=DISCLAIMER,
+    try:
+        actions = act(doc_type, facts, verifications)
+    except Exception:
+        logger.exception("act failed")
+
+    return DecodeResponse(
+        status="complete",
+        result=DecodeResult(
+            id=str(uuid.uuid4()),
+            doc_type=doc_type,
+            jurisdiction=resolved_jurisdiction,
+            plain_summary=plain_summary,
+            extracted_facts=facts,
+            claims=claims,
+            verification=verifications,
+            actions=actions,
+            disclaimer=DISCLAIMER,
+        ),
     )

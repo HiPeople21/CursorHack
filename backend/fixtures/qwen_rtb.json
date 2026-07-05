@@ -1,0 +1,62 @@
+{
+  "classify": {
+    "doc_type": "tenancy",
+    "jurisdiction": "IE"
+  },
+  "extract": {
+    "facts": [
+      {
+        "key": "notice_period_days",
+        "value": "14",
+        "span": "you are required to vacate the property within 14 days"
+      },
+      {
+        "key": "tenancy_start",
+        "value": "2021-03-01",
+        "span": "tenancy commencing 1 March 2021"
+      }
+    ],
+    "plain_summary": "This is a termination notice from your landlord ending your tenancy. It states you must leave within 14 days, but the notice period it gives appears shorter than the legal minimum for a tenancy of your length."
+  },
+  "verify": {
+    "claims": [
+      {
+        "statement": "The landlord issued a termination notice giving 14 days to vacate.",
+        "status": "supported",
+        "passage_id": null
+      },
+      {
+        "statement": "Tenancies of 3+ years require 90 days' notice in Ireland.",
+        "status": "contradicted",
+        "passage_id": "rtb-notice-90-days",
+        "quote": "notice period of 90 days where the tenancy has lasted 3 years or more"
+      }
+    ],
+    "verifications": [
+      {
+        "assertion": "14 days to vacate",
+        "rule_value": "90 days minimum (tenancy of 3+ years)",
+        "verdict": "mismatch",
+        "explanation": "For a tenancy that has lasted 3 years or more, Irish law (RTB) requires a minimum notice period of 90 days. This notice gives only 14, well short of the statutory minimum.",
+        "passage_id": "rtb-notice-90-days",
+        "quote": "notice period of 90 days where the tenancy has lasted 3 years or more"
+      }
+    ]
+  },
+  "act": {
+    "actions": [
+      {
+        "title": "Appeal letter to landlord",
+        "kind": "letter",
+        "body": "I am writing regarding the Notice of Termination dated [DATE]. Under the Residential Tenancies Act, a tenancy of my duration requires a minimum notice period of 90 days, not the 14 days stated. As such, this notice is invalid and I am not required to vacate on the date given. I reserve my right to remain in the property and to refer this matter to the RTB if necessary.",
+        "deadline": null
+      },
+      {
+        "title": "Respond before purported vacate date",
+        "kind": "deadline",
+        "body": "Notice states you must leave within 14 days of receipt.",
+        "deadline": null
+      }
+    ]
+  }
+}

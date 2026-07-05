@@ -45,10 +45,23 @@ def test_health_reports_demo_mode() -> None:
 def test_defective_notice_surfaces_mismatch_with_real_source() -> None:
     text = DEFECTIVE_NOTICE_PATH.read_text(encoding="utf-8")
 
-    resp = client.post("/api/decode", json={"text": text, "jurisdiction": "IE"})
+    # The pipeline now requires the governing institution before it produces a
+    # result; supply the RTB (as a user would from the needs_institution prompt)
+    # so the decode runs to completion.
+    resp = client.post(
+        "/api/decode",
+        json={
+            "text": text,
+            "jurisdiction": "IE",
+            "institution": {"body_id": "rtb"},
+        },
+    )
     assert resp.status_code == 200, resp.text
 
-    result = resp.json()
+    response = resp.json()
+    assert response["status"] == "complete", response
+    result = response["result"]
+    assert result is not None, "expected a DecodeResult on a complete response"
 
     verifications = result["verification"]
     assert isinstance(verifications, list) and verifications, (

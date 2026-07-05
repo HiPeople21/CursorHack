@@ -1,48 +1,39 @@
-"""Stage 1: classify(text) -> (doc_type, jurisdiction). One Qwen call.
+"""Stage 1: classify document type and jurisdiction."""
 
-Signature per CLAUDE.md: `classify(text) -> doc_type, jurisdiction`. We take
-an optional `default_jurisdiction` (the jurisdiction hint from the request)
-so the model has context and we always have a safe fallback if it returns
-nothing usable.
-"""
+from typing import Literal
 
-from __future__ import annotations
+from app.clients.qwen import chat_json
 
-from app.clients import qwen
-
-VALID_DOC_TYPES = {"tenancy", "insurance", "medical_bill", "gov_letter", "other"}
-
-SYSTEM_PROMPT = """You classify official/bureaucratic documents for a legal-rights tool.
-Respond with JSON only. No prose, no markdown, no explanation outside the JSON object.
-
-Return exactly this JSON shape:
-{"doc_type": "<one of: tenancy, insurance, medical_bill, gov_letter, other>", "jurisdiction": "<ISO country/region code, e.g. IE, US, UK>"}
-"""
+DocType = Literal["tenancy", "insurance", "medical_bill", "gov_letter", "other"]
 
 
-def classify(text: str, default_jurisdiction: str = "IE") -> tuple[str, str]:
-    """Classify a document's type and jurisdiction.
+def classify(text: str, jurisdiction: str = "IE") -> tuple[DocType, str]:
+    try:
+        result = chat_json(
+            system=(
+                "Classify the official document. Return JSON only: "
+                '{"doc_type": "tenancy|insurance|medical_bill|gov_letter|other", '
+                '"jurisdiction": "IE"}'
+            ),
+            user=text[:4000],
+            stage="classify",
+        )
+        doc_type = result.get("doc_type", "other")
+        if doc_type not in ("tenancy", "insurance", "medical_bill", "gov_letter", "other"):
+            doc_type = "other"
+        return doc_type, result.get("jurisdiction", jurisdiction or "IE")
+    except Exception:
+        return _heuristic_classify(text, jurisdiction)
 
-    Never raises. Falls back to ("other", default_jurisdiction) if the model
-    call fails or returns something unparseable/invalid.
-    """
-    user_prompt = (
-        f"Jurisdiction hint from user: {default_jurisdiction}\n\n"
-        f"Document text:\n{text[:6000]}"
-    )
 
-    data = qwen.chat_json(SYSTEM_PROMPT, user_prompt, mock_fixture="classify.json")
-
-    doc_type = "other"
-    jurisdiction = default_jurisdiction or "IE"
-
-    if isinstance(data, dict):
-        candidate_type = data.get("doc_type")
-        if isinstance(candidate_type, str) and candidate_type.strip().lower() in VALID_DOC_TYPES:
-            doc_type = candidate_type.strip().lower()
-
-        candidate_jurisdiction = data.get("jurisdiction")
-        if isinstance(candidate_jurisdiction, str) and candidate_jurisdiction.strip():
-            jurisdiction = candidate_jurisdiction.strip()
-
-    return doc_type, jurisdiction
+def _heuristic_classify(text: str, jurisdiction: str) -> tuple[DocType, str]:
+    lowered = text.lower()
+    if any(w in lowered for w in ("tenancy", "landlord", "rent", "rtb", "vacate")):
+        return "tenancy", jurisdiction or "IE"
+    if any(w in lowered for w in ("insurance", "policy", "premium", "claim")):
+        return "insurance", jurisdiction or "IE"
+    if any(w in lowered for w in ("hospital", "medical", "invoice", "treatment")):
+        return "medical_bill", jurisdiction or "IE"
+    if any(w in lowered for w in ("department", "minister", "revenue", "an post")):
+        return "gov_letter", jurisdiction or "IE"
+    return "other", jurisdiction or "IE"

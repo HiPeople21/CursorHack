@@ -17,6 +17,7 @@ from app.schemas import (
     Action,
     Claim,
     DecodeRequest,
+    DecodeResponse,
     DecodeResult,
     ExtractedFact,
     Source,
@@ -134,16 +135,19 @@ def _document_to_result(doc: Document) -> DecodeResult:
     )
 
 
-@router.post("/decode", response_model=DecodeResult)
-def decode(request: DecodeRequest, db: Session = Depends(get_db)) -> DecodeResult:
-    result = run_decode(request.text, request.jurisdiction)
+@router.post("/decode", response_model=DecodeResponse)
+def decode(request: DecodeRequest, db: Session = Depends(get_db)) -> DecodeResponse:
+    outcome = run_decode(request.text, request.jurisdiction, request.institution)
 
-    doc = _persist(result, request.text)
+    if outcome.status != "complete" or outcome.result is None:
+        return outcome
+
+    doc = _persist(outcome.result, request.text)
     db.add(doc)
     db.commit()
     db.refresh(doc)
 
-    return result
+    return outcome
 
 
 @router.get("/documents", response_model=list[DecodeResult])

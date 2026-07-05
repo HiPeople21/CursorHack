@@ -1,88 +1,172 @@
-"""Stage 4: ground(urls) -> passages[].
+"""Stage 5: scrape URLs and chunk into Passage objects."""
 
-Firecrawls each candidate URL to clean markdown, chunks it, and keeps
-url/title/retrieved_at alongside each chunk of text so verify() can pin a
-citation to an exact passage.
-"""
+import json
+import os
+import re
+import uuid
+from datetime import datetime, timezone
 
-from __future__ import annotations
+from app.clients.config import fixtures_dir, is_demo_mode
+from app.clients.firecrawl import scrape
+from app.pipeline.institution_store import report_link_failure, resolve_body_id_for_url
+from app.pipeline.types import IdentifiedBody, Passage
 
-from app.clients import firecrawl
-
-_MAX_CHUNK_CHARS = 900
-_MAX_CHUNKS_PER_URL = 40
-_MAX_TOTAL_CHUNKS = 150
-
-
-def _chunk_markdown(markdown: str, max_chars: int = _MAX_CHUNK_CHARS) -> list[str]:
-    """Split markdown into paragraph-aligned chunks of roughly max_chars.
-
-    Keeps paragraphs intact where possible (so a verbatim quote is unlikely
-    to be split across chunk boundaries); only splits a single overlong
-    paragraph as a last resort.
-    """
-    paragraphs = [p.strip() for p in markdown.split("\n\n") if p.strip()]
-    chunks: list[str] = []
-    buf = ""
-
-    for para in paragraphs:
-        if len(para) > max_chars:
-            if buf:
-                chunks.append(buf)
-                buf = ""
-            for i in range(0, len(para), max_chars):
-                chunks.append(para[i : i + max_chars])
-            continue
-
-        candidate = f"{buf}\n\n{para}" if buf else para
-        if len(candidate) <= max_chars:
-            buf = candidate
-        else:
-            if buf:
-                chunks.append(buf)
-            buf = para
-
-    if buf:
-        chunks.append(buf)
-
-    return chunks
+_HEADING_RE = re.compile(r"^(#{1,3})\s+(.+)$", re.MULTILINE)
+_MAX_CHUNK_CHARS = 3200
+_OVERLAP_CHARS = 200
 
 
-def ground(urls: list[dict[str, str]]) -> list[dict[str, str]]:
-    """Scrape each candidate URL and split it into citable passages.
+def ground(
+    urls: list[str],
+    bodies: list[IdentifiedBody] | None = None,
+    jurisdiction: str = "IE",
+) -> list[Passage]:
+    """Scrape each URL and return chunked passages."""
+    if is_demo_mode() and not urls:
+        return _load_fixture_passages()
 
-    Returns a list of passage dicts: {"url", "title", "retrieved_at", "content"}.
-    Never raises — a URL that fails to scrape is skipped, not fatal. Caps
-    chunks per URL and overall: a single scraped page (e.g. a full statute
-    PDF) can otherwise produce thousands of chunks, which blows the verify
-    stage's LLM call past its context window and silently kills all
-    claims/verifications for the whole request.
-    """
-    passages: list[dict[str, str]] = []
+    if is_demo_mode():
+        fixture = _load_fixture_passages()
+        if fixture:
+            return fixture
 
-    for item in urls:
-        if len(passages) >= _MAX_TOTAL_CHUNKS:
-            break
-        if not isinstance(item, dict):
-            continue
-        url = item.get("url")
-        if not url:
-            continue
+    passages: list[Passage] = []
+    retrieved_at = datetime.now(timezone.utc).isoformat()
 
-        scraped = firecrawl.scrape(url, title_hint=item.get("title"))
-        if not scraped:
-            continue
-
-        chunks = _chunk_markdown(scraped["markdown"])[:_MAX_CHUNKS_PER_URL]
-        remaining = _MAX_TOTAL_CHUNKS - len(passages)
-        for chunk in chunks[:remaining]:
-            passages.append(
-                {
-                    "url": scraped["url"],
-                    "title": scraped["title"],
-                    "retrieved_at": scraped["retrieved_at"],
-                    "content": chunk,
-                }
+    for url in urls:
+        try:
+            page = scrape(url)
+            body_id = _resolve_body_id(url, bodies, jurisdiction)
+            chunks = chunk_markdown(
+                markdown=page.get("markdown", ""),
+                url=page.get("url", url),
+                title=page.get("title", url),
+                retrieved_at=retrieved_at,
+                body_id=body_id,
             )
+            passages.extend(chunks)
+        except Exception:
+            replacement_urls = report_link_failure(url)
+            for replacement_url in replacement_urls:
+                if replacement_url == url:
+                    continue
+                try:
+                    page = scrape(replacement_url)
+                    body_id = _resolve_body_id(replacement_url, bodies, jurisdiction)
+                    chunks = chunk_markdown(
+                        markdown=page.get("markdown", ""),
+                        url=page.get("url", replacement_url),
+                        title=page.get("title", replacement_url),
+                        retrieved_at=retrieved_at,
+                        body_id=body_id,
+                    )
+                    passages.extend(chunks)
+                except Exception:
+                    continue
+            continue
+
+    if not passages and is_demo_mode():
+        return _load_fixture_passages()
 
     return passages
+
+
+def chunk_markdown(
+    markdown: str,
+    url: str,
+    title: str,
+    retrieved_at: str,
+    body_id: str | None = None,
+) -> list[Passage]:
+    """Split markdown on headings, then window into ~800-token chunks."""
+    if not markdown.strip():
+        return []
+
+    sections = _split_on_headings(markdown)
+    passages: list[Passage] = []
+    chunk_index = 0
+
+    for heading, body in sections:
+        windows = _window_text(body)
+        for window in windows:
+            passages.append(
+                Passage(
+                    passage_id=str(uuid.uuid4()),
+                    body_id=body_id,
+                    url=url,
+                    title=title,
+                    section_heading=heading,
+                    text=window,
+                    retrieved_at=retrieved_at,
+                    chunk_index=chunk_index,
+                )
+            )
+            chunk_index += 1
+
+    return passages
+
+
+def _split_on_headings(markdown: str) -> list[tuple[str | None, str]]:
+    sections: list[tuple[str | None, str]] = []
+    current_heading: str | None = None
+    current_lines: list[str] = []
+
+    for line in markdown.splitlines():
+        match = _HEADING_RE.match(line)
+        if match:
+            if current_lines:
+                sections.append((current_heading, "\n".join(current_lines).strip()))
+                current_lines = []
+            current_heading = match.group(2).strip()
+        else:
+            current_lines.append(line)
+
+    if current_lines:
+        sections.append((current_heading, "\n".join(current_lines).strip()))
+
+    if not sections:
+        return [(None, markdown.strip())]
+
+    return sections
+
+
+def _window_text(text: str) -> list[str]:
+    if len(text) <= _MAX_CHUNK_CHARS:
+        return [text] if text.strip() else []
+
+    windows: list[str] = []
+    start = 0
+    while start < len(text):
+        end = min(start + _MAX_CHUNK_CHARS, len(text))
+        windows.append(text[start:end].strip())
+        if end >= len(text):
+            break
+        start = end - _OVERLAP_CHARS
+    return [w for w in windows if w]
+
+
+def _resolve_body_id(
+    url: str,
+    bodies: list[IdentifiedBody] | None,
+    jurisdiction: str,
+) -> str | None:
+    from_registry = resolve_body_id_for_url(url, jurisdiction)
+    if from_registry:
+        return from_registry
+    if bodies:
+        from app.pipeline.jurisdiction import compose_institution_id
+
+        body = bodies[0]
+        place = body.jurisdiction or jurisdiction
+        return compose_institution_id(body.body_id, place)
+    return None
+
+
+def _load_fixture_passages() -> list[Passage]:
+    path = os.path.join(fixtures_dir(), "passages_rtb.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            raw = json.load(f)
+        return [Passage(**item) for item in raw]
+    except Exception:
+        return []

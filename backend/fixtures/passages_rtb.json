@@ -1,0 +1,22 @@
+[
+  {
+    "passage_id": "rtb-notice-90-days",
+    "body_id": "IE:rtb",
+    "url": "https://www.citizensinformation.ie/en/housing/renting-a-home/tenants-and-landlords/ending-a-tenancy/",
+    "title": "Ending a tenancy - Citizens Information",
+    "section_heading": "Notice periods",
+    "text": "The amount of notice required depends on how long the tenancy has lasted. For a tenancy that has lasted between 3 years and 7 years, the landlord must give a notice period of 90 days. For a tenancy that has lasted 7 years or more, the notice period is 112 days. A notice of termination must be in writing and must specify the date of termination.",
+    "retrieved_at": "2026-07-05T12:00:00+00:00",
+    "chunk_index": 0
+  },
+  {
+    "passage_id": "rtb-notice-invalid",
+    "body_id": "IE:rtb",
+    "url": "https://www.citizensinformation.ie/en/housing/renting-a-home/tenants-and-landlords/ending-a-tenancy/",
+    "title": "Ending a tenancy - Citizens Information",
+    "section_heading": "Invalid notices",
+    "text": "If a notice of termination does not comply with the required notice period, it is invalid. The tenant is not obliged to leave the property on the date specified in an invalid notice. The tenant may refer a dispute to the Residential Tenancies Board (RTB).",
+    "retrieved_at": "2026-07-05T12:00:00+00:00",
+    "chunk_index": 1
+  }
+]

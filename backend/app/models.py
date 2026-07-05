@@ -137,3 +137,52 @@ class ActionRow(Base):
     deadline: Mapped[str | None] = mapped_column(String, nullable=True)
 
     document: Mapped["Document"] = relationship(back_populates="actions")
+
+
+class Institution(Base):
+    """Permanent registry of government/institutional bodies."""
+
+    __tablename__ = "institutions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    display_name: Mapped[str] = mapped_column(String)
+    jurisdiction: Mapped[str] = mapped_column(String)
+    domains: Mapped[str] = mapped_column(Text, default="[]")
+    doc_types: Mapped[str] = mapped_column(Text, default="[]")
+    search_queries: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[str] = mapped_column(String, default=_now_iso)
+    updated_at: Mapped[str] = mapped_column(String, default=_now_iso)
+
+    legal_links: Mapped[list["InstitutionLegalLink"]] = relationship(
+        back_populates="institution", cascade="all, delete-orphan"
+    )
+
+
+class UserProfileRow(Base):
+    """User profile with PII stored as a Fernet-encrypted JSON blob."""
+
+    __tablename__ = "user_profiles"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    jurisdiction: Mapped[str] = mapped_column(String, default="IE")
+    encrypted_payload: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[str] = mapped_column(String, default=_now_iso)
+    updated_at: Mapped[str] = mapped_column(String, default=_now_iso)
+
+
+class InstitutionLegalLink(Base):
+    """Persistent URLs to governing legal documents for an institution."""
+
+    __tablename__ = "institution_legal_links"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    institution_id: Mapped[str] = mapped_column(ForeignKey("institutions.id"))
+    url: Mapped[str] = mapped_column(String)
+    title: Mapped[str] = mapped_column(String, default="")
+    status: Mapped[str] = mapped_column(String, default="active")
+    discovered_via: Mapped[str] = mapped_column(String, default="seed")
+    last_checked_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    last_working_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[str] = mapped_column(String, default=_now_iso)
+
+    institution: Mapped["Institution"] = relationship(back_populates="legal_links")

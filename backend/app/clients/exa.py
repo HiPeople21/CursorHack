@@ -1,85 +1,58 @@
-"""Exa neural search client — finds candidate governing-rule pages.
-
-DEMO_MODE=1 (or missing EXA_API_KEY) returns a canned fixture instead of
-hitting the network. Never raises: any failure on the live path degrades to
-an empty result list so `retrieve.py` (and the rest of the pipeline) can
-carry on with nothing to ground against.
-"""
-
-from __future__ import annotations
+"""Exa neural search client with DEMO_MODE fixtures."""
 
 import json
-import logging
 import os
-from pathlib import Path
 from typing import Any
 
 import httpx
 
-logger = logging.getLogger(__name__)
+from app.clients.config import fixtures_dir, is_demo_mode
 
-FIXTURES_DIR = Path(__file__).resolve().parent.parent.parent / "fixtures" / "exa"
-
-
-def _demo_mode() -> bool:
-    return os.getenv("DEMO_MODE", "1") == "1"
+_FIXTURE_PATH = os.path.join(fixtures_dir(), "exa_search_rtb.json")
 
 
-def _api_key() -> str:
-    return os.getenv("EXA_API_KEY", "").strip()
-
-
-def _load_fixture(name: str) -> list[dict[str, Any]]:
-    try:
-        with open(FIXTURES_DIR / name, encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return []
-    results = data.get("results") if isinstance(data, dict) else None
-    if not isinstance(results, list):
-        return []
-    return [r for r in results if isinstance(r, dict) and r.get("url")]
+def _use_mock() -> bool:
+    return is_demo_mode() or not os.getenv("EXA_API_KEY")
 
 
 def search(
     query: str,
+    include_domains: list[str] | None = None,
     num_results: int = 5,
-    mock_fixture: str = "retrieve.json",
 ) -> list[dict[str, str]]:
-    """Neural search for governing-rule pages.
+    """Return top search results as {url, title} dicts."""
+    if _use_mock():
+        with open(_FIXTURE_PATH, encoding="utf-8") as f:
+            data: dict[str, Any] = json.load(f)
+        return data.get("results", [])[:num_results]
 
-    Returns a list of {"url": str, "title": str} dicts, most relevant first.
-    Demo mode / missing key -> canned fixture. Live-call failures -> [].
-    """
-    if _demo_mode() or not _api_key():
-        return _load_fixture(mock_fixture)[:num_results]
+    payload: dict[str, Any] = {
+        "query": query,
+        "type": "neural",
+        "numResults": num_results,
+        "useAutoprompt": True,
+    }
+    if include_domains:
+        payload["includeDomains"] = include_domains
 
-    try:
-        resp = httpx.post(
+    with httpx.Client(timeout=30.0) as client:
+        resp = client.post(
             "https://api.exa.ai/search",
             headers={
-                "x-api-key": _api_key(),
+                "x-api-key": os.getenv("EXA_API_KEY", ""),
                 "Content-Type": "application/json",
             },
-            json={
-                "query": query,
-                "type": "neural",
-                "numResults": num_results,
-            },
-            timeout=20,
+            json=payload,
         )
         resp.raise_for_status()
         data = resp.json()
-        results = data.get("results", []) if isinstance(data, dict) else []
-        out: list[dict[str, str]] = []
-        for r in results:
-            if not isinstance(r, dict):
-                continue
-            url = r.get("url")
-            if not url:
-                continue
-            out.append({"url": url, "title": r.get("title") or url})
-        return out[:num_results]
-    except Exception:
-        logger.exception("Exa search call failed (query=%r)", query)
-        return []
+
+    results: list[dict[str, str]] = []
+    for item in data.get("results", []):
+        results.append(
+            {
+                "url": item.get("url", ""),
+                "title": item.get("title", item.get("url", "")),
+            }
+        )
+    return results
