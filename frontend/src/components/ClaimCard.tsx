@@ -18,7 +18,7 @@ export default function ClaimCard({ claim }: ClaimCardProps) {
   return (
     <div
       className={`rounded-xl border p-4 ${
-        isContradicted ? 'border-red-200 bg-red-50/50' : 'border-stone-200 bg-white'
+        isContradicted ? 'border-red-200 bg-red-50/50' : 'border-stone-200 bg-surface'
       }`}
     >
       <div className="flex items-start justify-between gap-3">

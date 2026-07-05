@@ -8,6 +8,8 @@ interface SidebarProps {
   onDelete: (id: string) => void;
   onOpenProfile: () => void;
   profileName: string | null;
+  isGhost: boolean;
+  onToggleTheme: () => void;
 }
 
 function verdictDot(session: Session): string {
@@ -27,9 +29,11 @@ export default function Sidebar({
   onDelete,
   onOpenProfile,
   profileName,
+  isGhost,
+  onToggleTheme,
 }: SidebarProps) {
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-stone-200 bg-white">
+    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-stone-200 bg-surface">
       {/* Brand */}
       <div className="flex items-center gap-2 px-4 py-4">
         <span
@@ -124,6 +128,59 @@ export default function Sidebar({
         </ul>
       </div>
 
+      {/* Ghost mode toggle */}
+      <div className="px-2 pt-2">
+        <button
+          type="button"
+          onClick={onToggleTheme}
+          role="switch"
+          aria-checked={isGhost}
+          className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-stone-100"
+        >
+          <span
+            aria-hidden
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-stone-500"
+          >
+            {/* ghost glyph */}
+            <svg
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              aria-hidden
+            >
+              <path
+                d="M4 16V9a6 6 0 0 1 12 0v7l-2-1.3-2 1.3-2-1.3-2 1.3L4 16Z"
+                strokeLinejoin="round"
+              />
+              <circle cx="8" cy="9" r="0.9" fill="currentColor" stroke="none" />
+              <circle cx="12" cy="9" r="0.9" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-stone-800">
+              Ghost mode
+            </span>
+            <span className="block text-xs text-stone-400">
+              {isGhost ? 'On — dark theme' : 'Off — light theme'}
+            </span>
+          </span>
+          <span
+            aria-hidden
+            className={`relative h-5 w-9 shrink-0 rounded-full transition ${
+              isGhost ? 'bg-indigo-600' : 'bg-stone-300'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
+                isGhost ? 'left-4' : 'left-0.5'
+              }`}
+            />
+          </span>
+        </button>
+      </div>
+
       {/* Profile — pinned bottom */}
       <div className="border-t border-stone-200 p-2">
         <button
@@ -133,7 +190,7 @@ export default function Sidebar({
         >
           <span
             aria-hidden
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-800 text-xs font-bold text-white"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white"
           >
             {profileName
               ? profileName

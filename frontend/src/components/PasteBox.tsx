@@ -94,7 +94,7 @@ export default function PasteBox({
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white rounded-2xl border border-stone-200 shadow-sm p-5 sm:p-7"
+      className="bg-surface rounded-2xl border border-stone-200 shadow-sm p-5 sm:p-7"
     >
       <div className="flex items-center justify-between gap-3 mb-3">
         <label
@@ -120,7 +120,7 @@ export default function PasteBox({
         onChange={(e) => onTextChange(e.target.value)}
         placeholder="Paste the full text of the tenancy notice, insurance letter, medical bill, or government letter here..."
         rows={12}
-        className="w-full resize-y rounded-xl border border-stone-300 bg-stone-50 p-4 text-sm leading-relaxed text-stone-800 shadow-inner focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+        className="w-full resize-y rounded-xl border border-stone-300 bg-stone-50 p-4 text-sm leading-relaxed text-stone-800 shadow-inner focus:border-indigo-400 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-indigo-100"
       />
 
       <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -129,7 +129,7 @@ export default function PasteBox({
           <select
             value={jurisdiction}
             onChange={(e) => onJurisdictionChange(e.target.value)}
-            className="rounded-md border border-stone-300 bg-white px-2 py-1 text-xs font-medium text-stone-700"
+            className="rounded-md border border-stone-300 bg-surface px-2 py-1 text-xs font-medium text-stone-700"
           >
             {JURISDICTIONS.map((j) => (
               <option key={j.value || 'auto'} value={j.value}>
@@ -176,7 +176,7 @@ export default function PasteBox({
                   type="button"
                   disabled={loading}
                   onClick={() => void submit({ body_id: s.body_id })}
-                  className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
+                  className="rounded-lg border border-amber-300 bg-surface px-3 py-1.5 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
                 >
                   {s.display_name}
                 </button>
@@ -189,7 +189,7 @@ export default function PasteBox({
               value={institutionText}
               onChange={(e) => setInstitutionText(e.target.value)}
               placeholder="Or type the authority's name (e.g. Residential Tenancies Board)"
-              className="min-w-0 flex-1 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-stone-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              className="min-w-0 flex-1 rounded-lg border border-amber-300 bg-surface px-3 py-2 text-sm text-stone-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
             />
             <button
               type="button"

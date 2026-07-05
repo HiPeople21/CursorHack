@@ -27,7 +27,7 @@ export default function ActionCard({ action }: ActionCardProps) {
   }
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
+    <div className="rounded-2xl border border-stone-200 bg-surface p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="inline-flex rounded-full bg-indigo-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-indigo-700">

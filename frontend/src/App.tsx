@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar';
 import ProfilePanel, { PROFILE_ID_KEY } from './components/ProfilePanel';
 import { getHealth, getProfile } from './api/client';
 import { useSessions } from './hooks/useSessions';
+import { useTheme } from './hooks/useTheme';
 
 function App() {
   const {
@@ -20,6 +21,7 @@ function App() {
     setResult,
   } = useSessions();
 
+  const { isGhost, toggle: toggleTheme } = useTheme();
   const [profileOpen, setProfileOpen] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [health, setHealth] = useState<HealthStatus | null>(null);
@@ -56,6 +58,8 @@ function App() {
         onDelete={remove}
         onOpenProfile={() => setProfileOpen(true)}
         profileName={profile?.full_name ?? null}
+        isGhost={isGhost}
+        onToggleTheme={toggleTheme}
       />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
@@ -69,7 +73,7 @@ function App() {
           </div>
         )}
 
-        <header className="sticky top-0 z-10 border-b border-stone-200 bg-white/90 backdrop-blur">
+        <header className="sticky top-0 z-10 border-b border-stone-200 bg-surface/90 backdrop-blur">
           <div className="mx-auto max-w-3xl px-4 py-4 sm:px-6">
             <h1 className="text-lg font-bold tracking-tight text-stone-900">
               {active?.title || 'New document'}
