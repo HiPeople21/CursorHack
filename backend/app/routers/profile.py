@@ -54,10 +54,8 @@ def _payload_from_update(existing: dict[str, Any], data: UserProfileUpdate) -> d
 
 
 def _row_to_profile(row: UserProfileRow) -> UserProfile:
-    try:
-        payload = decrypt_payload(row.encrypted_payload)
-    except ProfileDecryptionError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    # Lets ProfileDecryptionError propagate; callers map it to the right status.
+    payload = decrypt_payload(row.encrypted_payload)
 
     extra = payload.get("extra") or {}
     if isinstance(extra, str):
@@ -104,7 +102,15 @@ def get_profile(profile_id: str, db: Session = Depends(get_db)) -> UserProfile:
     row = db.get(UserProfileRow, profile_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Profile not found")
-    return _row_to_profile(row)
+    try:
+        return _row_to_profile(row)
+    except ProfileDecryptionError as exc:
+        # The row exists but was encrypted under a different key (e.g. an old
+        # ephemeral demo key). Treat it as gone so a stale client id degrades
+        # to "set up a profile" instead of a hard 500.
+        raise HTTPException(
+            status_code=404, detail="Profile can no longer be decrypted"
+        ) from exc
 
 
 @router.put("/{profile_id}", response_model=UserProfile)
@@ -120,7 +126,9 @@ def update_profile(
     try:
         existing = decrypt_payload(row.encrypted_payload)
     except ProfileDecryptionError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=404, detail="Profile can no longer be decrypted"
+        ) from exc
 
     payload = _payload_from_update(existing, body)
     row.jurisdiction = body.jurisdiction if body.jurisdiction is not None else row.jurisdiction

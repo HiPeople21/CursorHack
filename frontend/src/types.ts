@@ -68,7 +68,7 @@ export interface UserProvidedInstitution {
 
 export interface DecodeRequest {
   text: string;
-  jurisdiction?: string; // defaults to "IE"
+  jurisdiction?: string; // auto-detected from document when omitted
   institution?: UserProvidedInstitution | null;
 }
 
@@ -83,11 +83,48 @@ export interface InstitutionPrompt {
   suggestions: InstitutionSuggestion[];
 }
 
-// POST /api/decode now returns this wrapper, not a bare DecodeResult.
+// POST /api/decode returns this wrapper, not a bare DecodeResult.
 export interface DecodeResponse {
   status: 'complete' | 'needs_institution';
   institution_prompt: InstitutionPrompt | null;
   result: DecodeResult | null;
+  lawyer_referral_eligible?: boolean;
+  lawyer_referral_reason?: string;
+}
+
+// --- Lawyer referrals (standalone endpoint — not on DecodeResult) ---
+
+export interface LawyerReferral {
+  name: string;
+  firm: string;
+  practice_area: string;
+  location: string;
+  url: string | null;
+  phone: string | null;
+  reason: string;
+}
+
+export interface LawyerSearchLocation {
+  city?: string | null;
+  county?: string | null;
+  jurisdiction?: string | null;
+}
+
+export interface LawyerRecommendRequest {
+  doc_type?: DocType;
+  jurisdiction?: string;
+  location?: LawyerSearchLocation | null;
+  profile_id?: string | null;
+  plain_summary?: string;
+  extracted_facts?: ExtractedFact[];
+  claims?: Claim[];
+  verification?: Verification[];
+}
+
+export interface LawyerRecommendResponse {
+  referrals: LawyerReferral[];
+  eligible: boolean;
+  reason: string;
 }
 
 // GET /api/health

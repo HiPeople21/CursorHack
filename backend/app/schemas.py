@@ -43,6 +43,26 @@ class Action(BaseModel):
     deadline: Optional[str] = None
 
 
+class LawyerReferral(BaseModel):
+    """Specialist lawyer recommendation when the pipeline cannot ground an answer."""
+
+    name: str
+    firm: str
+    practice_area: str
+    location: str  # city/county display, e.g. "Dublin, Ireland"
+    url: Optional[str] = None
+    phone: Optional[str] = None
+    reason: str  # why this referral was surfaced
+
+
+class LawyerSearchLocation(BaseModel):
+    """Geographic hint for lawyer search — from profile or explicit request."""
+
+    city: Optional[str] = None
+    county: Optional[str] = None
+    jurisdiction: Optional[str] = None
+
+
 class DecodeResult(BaseModel):
     id: str
     doc_type: Literal["tenancy", "insurance", "medical_bill", "gov_letter", "other"]
@@ -57,8 +77,27 @@ class DecodeResult(BaseModel):
 
 class DecodeRequest(BaseModel):
     text: str
-    jurisdiction: str = "IE"
+    jurisdiction: Optional[str] = None  # auto-detected from document when omitted
     institution: Optional["UserProvidedInstitution"] = None
+
+
+class LawyerRecommendRequest(BaseModel):
+    """Standalone lawyer recommendation — e.g. after a partial decode."""
+
+    doc_type: Literal["tenancy", "insurance", "medical_bill", "gov_letter", "other"] = "other"
+    jurisdiction: str = "IE"
+    location: Optional[LawyerSearchLocation] = None
+    profile_id: Optional[str] = None
+    plain_summary: str = ""
+    extracted_facts: list[ExtractedFact] = []
+    claims: list[Claim] = []
+    verification: list[Verification] = []
+
+
+class LawyerRecommendResponse(BaseModel):
+    referrals: list[LawyerReferral]
+    eligible: bool
+    reason: str
 
 
 class UserProvidedInstitution(BaseModel):
@@ -83,6 +122,8 @@ class DecodeResponse(BaseModel):
     status: Literal["complete", "needs_institution"]
     institution_prompt: Optional[InstitutionPrompt] = None
     result: Optional[DecodeResult] = None
+    lawyer_referral_eligible: bool = False
+    lawyer_referral_reason: str = ""
 
 
 # --- Profile (autofill) — not part of the frozen DecodeResult contract ---

@@ -18,7 +18,7 @@ export function newSession(): Session {
     id: uid(),
     title: 'New document',
     text: '',
-    jurisdiction: 'IE',
+    jurisdiction: '',
     result: null,
     createdAt: ts,
     updatedAt: ts,

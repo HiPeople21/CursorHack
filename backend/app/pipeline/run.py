@@ -1,4 +1,4 @@
-"""Pipeline entry point — chains classify → identify → extract → retrieve → ground → verify → act."""
+"""Pipeline entry point — chains classify → identify → extract → retrieve → ground → verify → act → refer."""
 
 import logging
 import uuid
@@ -12,6 +12,8 @@ from app.pipeline.institution_resolve import (
     build_institution_prompt,
     institution_from_user_input,
 )
+from app.pipeline.jurisdiction import infer_jurisdiction_from_text
+from app.pipeline.refer_lawyers import eligibility_reason, needs_lawyer_referral
 from app.pipeline.retrieve import retrieve
 from app.pipeline.verify import verify
 from app.schemas import DecodeResponse, DecodeResult, UserProvidedInstitution
@@ -23,12 +25,12 @@ DISCLAIMER = "Information, not legal advice."
 
 def run_decode(
     text: str,
-    jurisdiction: str = "IE",
+    jurisdiction: str | None = None,
     institution: UserProvidedInstitution | None = None,
 ) -> DecodeResponse:
     """Run the decode pipeline with graceful degradation per stage."""
     doc_type = "other"
-    resolved_jurisdiction = jurisdiction or "IE"
+    resolved_jurisdiction = jurisdiction or ""
     bodies = []
     facts = []
     plain_summary = "Document received for analysis."
@@ -37,9 +39,11 @@ def run_decode(
     actions = []
 
     try:
-        doc_type, resolved_jurisdiction = classify(text, resolved_jurisdiction)
+        doc_type, resolved_jurisdiction = classify(text, resolved_jurisdiction or None)
     except Exception:
         logger.exception("classify failed")
+        if not resolved_jurisdiction:
+            resolved_jurisdiction = infer_jurisdiction_from_text(text) or "UNK"
 
     try:
         bodies = identify_bodies(text, doc_type, resolved_jurisdiction)
@@ -87,8 +91,28 @@ def run_decode(
     except Exception:
         logger.exception("act failed")
 
+    lawyer_referral_eligible = False
+    lawyer_referral_reason = ""
+    try:
+        lawyer_referral_eligible = needs_lawyer_referral(
+            passages=passages,
+            claims=claims,
+            verifications=verifications,
+            facts=facts,
+        )
+        lawyer_referral_reason = eligibility_reason(
+            passages=passages,
+            claims=claims,
+            verifications=verifications,
+            facts=facts,
+        )
+    except Exception:
+        logger.exception("lawyer referral eligibility check failed")
+
     return DecodeResponse(
         status="complete",
+        lawyer_referral_eligible=lawyer_referral_eligible,
+        lawyer_referral_reason=lawyer_referral_reason,
         result=DecodeResult(
             id=str(uuid.uuid4()),
             doc_type=doc_type,

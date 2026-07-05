@@ -14,7 +14,7 @@ load_dotenv()
 from app.crypto import ensure_encryption_key  # noqa: E402
 from app.db import Base, SessionLocal, engine  # noqa: E402  (import after load_dotenv)
 from app.pipeline.institution_seed import seed_institutions_from_fixture
-from app.routers import decode, profile  # noqa: E402
+from app.routers import decode, lawyers, profile  # noqa: E402
 
 app = FastAPI(title="Standing API")
 
@@ -46,6 +46,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SecurityHeadersMiddleware)
 
 app.include_router(decode.router)
+app.include_router(lawyers.router)
 app.include_router(profile.router)
 
 

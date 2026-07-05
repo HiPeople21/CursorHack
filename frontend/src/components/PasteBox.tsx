@@ -29,6 +29,7 @@ within 14 days of this notice.
 Date of this notice: 21 June 2026`;
 
 const JURISDICTIONS = [
+  { value: '', label: 'Auto-detect' },
   { value: 'IE', label: 'Ireland (IE)' },
   { value: 'GB', label: 'United Kingdom (GB)' },
 ];
@@ -50,7 +51,7 @@ export default function PasteBox({
     setLoading(true);
     setError(null);
     try {
-      const response = await decode(text, jurisdiction, institution);
+      const response = await decode(text, jurisdiction || undefined, institution);
       if (response.status === 'needs_institution') {
         setPrompt(response.institution_prompt);
         return;
@@ -59,7 +60,15 @@ export default function PasteBox({
         setPrompt(null);
         setInstitutionText('');
         onResult(response.result);
+        return;
       }
+      // Reached only if the server returns a shape we don't understand
+      // (e.g. a stale backend on the old contract). Fail loudly rather than
+      // leaving the user staring at a spinner that silently resolved.
+      setError(
+        'The server returned an unexpected response. It may be running an ' +
+          'older version — try restarting the backend and decoding again.'
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
@@ -85,13 +94,15 @@ export default function PasteBox({
         >
           Paste your letter, notice, or bill
         </label>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-500">
-          <span
-            aria-hidden
-            className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"
-          />
-          Jurisdiction: {jurisdiction}
-        </span>
+        {jurisdiction && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-500">
+            <span
+              aria-hidden
+              className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"
+            />
+            Hint: {jurisdiction}
+          </span>
+        )}
       </div>
 
       <textarea
@@ -105,14 +116,14 @@ export default function PasteBox({
 
       <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
-          <span>Default jurisdiction:</span>
+          <span>Jurisdiction:</span>
           <select
             value={jurisdiction}
             onChange={(e) => onJurisdictionChange(e.target.value)}
             className="rounded-md border border-stone-300 bg-white px-2 py-1 text-xs font-medium text-stone-700"
           >
             {JURISDICTIONS.map((j) => (
-              <option key={j.value} value={j.value}>
+              <option key={j.value || 'auto'} value={j.value}>
                 {j.label}
               </option>
             ))}

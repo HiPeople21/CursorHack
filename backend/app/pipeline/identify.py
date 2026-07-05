@@ -6,7 +6,7 @@ When nothing is found, the pipeline asks the user to supply the institution.
 
 import re
 
-from app.pipeline.jurisdiction import normalize_jurisdiction
+from app.pipeline.jurisdiction import infer_jurisdiction_from_text, normalize_jurisdiction
 from app.pipeline.types import IdentifiedBody
 
 
@@ -16,16 +16,18 @@ def identify_bodies(
     jurisdiction: str,
 ) -> list[IdentifiedBody]:
     """Identify government bodies explicitly referenced in the document text."""
-    place = normalize_jurisdiction(jurisdiction)
+    place = normalize_jurisdiction(jurisdiction) or infer_jurisdiction_from_text(text) or "UNK"
     lowered = text.lower()
 
-    if place == "IE":
-        return _identify_ie(lowered, text, place)
-
-    if place == "GB":
-        return _identify_gb(lowered, text, place)
-
-    return []
+    bodies = _identify_ie(lowered, text, place) + _identify_gb(lowered, text, place)
+    seen: set[str] = set()
+    unique: list[IdentifiedBody] = []
+    for body in bodies:
+        if body.body_id in seen:
+            continue
+        seen.add(body.body_id)
+        unique.append(body)
+    return unique
 
 
 def _identify_ie(lowered: str, text: str, place: str) -> list[IdentifiedBody]:

@@ -9,11 +9,57 @@ JURISDICTION_LABELS: dict[str, str] = {
 }
 
 
-def normalize_jurisdiction(jurisdiction: str) -> str:
-    code = (jurisdiction or "IE").strip().upper()
+def normalize_jurisdiction(jurisdiction: str | None) -> str:
+    if jurisdiction is None or not str(jurisdiction).strip():
+        return ""
+    code = str(jurisdiction).strip().upper()
     if code == "UK":
         return "GB"
-    return code or "IE"
+    return code
+
+
+def infer_jurisdiction_from_text(text: str) -> str:
+    """Best-effort jurisdiction guess from document text when classify is unavailable."""
+    lowered = text.lower()
+    if any(
+        marker in lowered
+        for marker in (
+            "ireland",
+            "dublin",
+            "cork",
+            "galway",
+            "eircode",
+            "citizensinformation",
+            "revenue.ie",
+            "residential tenancies board",
+        )
+    ):
+        return "IE"
+    if any(
+        marker in lowered
+        for marker in (
+            "united kingdom",
+            "gov.uk",
+            "hmrc",
+            "hm revenue and customs",
+            "england",
+            "scotland",
+            "wales",
+            "northern ireland",
+        )
+    ):
+        return "GB"
+    if any(
+        marker in lowered
+        for marker in (
+            "united states",
+            "irs",
+            "social security administration",
+            ".gov ",
+        )
+    ):
+        return "US"
+    return ""
 
 
 def jurisdiction_label(jurisdiction: str) -> str:

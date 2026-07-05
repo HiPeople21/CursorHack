@@ -23,18 +23,21 @@ async function readError(res: Response): Promise<string> {
 
 export async function decode(
   text: string,
-  jurisdiction: string = 'IE',
+  jurisdiction?: string,
   institution?: UserProvidedInstitution | null
 ): Promise<DecodeResponse> {
   if (USE_MOCK) {
     return delay({
       status: 'complete',
       institution_prompt: null,
-      result: { ...sampleResult, jurisdiction },
+      result: { ...sampleResult, jurisdiction: jurisdiction || sampleResult.jurisdiction },
+      lawyer_referral_eligible: false,
+      lawyer_referral_reason: '',
     });
   }
 
-  const payload: DecodeRequest = { text, jurisdiction };
+  const payload: DecodeRequest = { text };
+  if (jurisdiction) payload.jurisdiction = jurisdiction;
   if (institution) payload.institution = institution;
 
   const res = await fetch('/api/decode', {
