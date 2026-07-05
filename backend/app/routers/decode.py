@@ -66,8 +66,20 @@ def _document_to_result(doc: Document) -> DecodeResult:
     )
 
 
+def _require_document_text(text: str) -> None:
+    """Reject blank submissions before spending a pipeline/LLM call on them.
+
+    Mirrors the ``decode_upload`` "Empty file" guard: a whitespace-only paste
+    should get a clear 400, not a confusing "which body governs this document?"
+    institution prompt run against nothing.
+    """
+    if not text or not text.strip():
+        raise HTTPException(status_code=400, detail="No document text provided")
+
+
 @router.post("/decode", response_model=DecodeResponse)
 def decode(request: DecodeRequest, db: Session = Depends(get_db)) -> DecodeResponse:
+    _require_document_text(request.text)
     outcome = run_decode(request.text, request.jurisdiction, request.institution)
 
     if outcome.status != "complete" or outcome.result is None:
@@ -207,6 +219,7 @@ def decode_stream(
     via GET /decode/stream/{job_id}. Pass a stable job_id (the client uses its
     session id) to make reconnection possible.
     """
+    _require_document_text(request.text)
     resolved_id = job_id or str(uuid.uuid4())
     job = start_job(resolved_id, request.text, request.jurisdiction, request.institution)
     return StreamingResponse(

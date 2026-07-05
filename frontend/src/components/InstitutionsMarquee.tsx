@@ -33,8 +33,6 @@ export default function InstitutionsMarquee() {
           gap={60}
           hoverSpeed={0}
           scaleOnHover
-          fadeOut
-          fadeOutColor="#1c1917"
           ariaLabel="Institutions we support"
         />
       </div>

@@ -1,5 +1,7 @@
 """Stage 6: verify document assertions against grounded passages."""
 
+import re
+
 from app.clients.qwen import chat_json
 from app.pipeline.types import Passage
 from app.rag.retriever import retrieve_passages
@@ -31,7 +33,11 @@ def verify(
                 '"verdict": "matches|mismatch|cannot_determine", "explanation": str, '
                 '"passage_id": str|null, "quote": str|null}]}. '
                 "quote must be <15 words verbatim from the passage. "
-                "No passage_id => unverifiable/cannot_determine."
+                "No passage_id => unverifiable/cannot_determine. "
+                "Write statement and explanation for a layperson: describe what the "
+                "rule says in plain English. NEVER mention passage IDs, ID codes, or "
+                "hex strings in statement or explanation — cite the rule by what it says, "
+                "not by its internal reference."
             ),
             user=f"FACTS:\n{fact_context}\n\nPASSAGES:\n{passage_context}",
             stage="verify",
@@ -54,6 +60,7 @@ def _parse_verify_result(
     passages: list[Passage],
 ) -> tuple[list[Claim], list[Verification]]:
     passage_by_id = {p.passage_id: p for p in passages}
+    strip = _passage_ref_stripper(passages)
 
     claims: list[Claim] = []
     for item in result.get("claims", []):
@@ -62,7 +69,7 @@ def _parse_verify_result(
         if status not in ("supported", "contradicted", "unverifiable"):
             status = "unverifiable"
         claims.append(
-            Claim(statement=item.get("statement", ""), status=status, source=source)
+            Claim(statement=strip(item.get("statement", "")), status=status, source=source)
         )
 
     verifications: list[Verification] = []
@@ -73,10 +80,10 @@ def _parse_verify_result(
             verdict = "cannot_determine"
         verifications.append(
             Verification(
-                assertion=item.get("assertion", ""),
-                rule_value=item.get("rule_value", ""),
+                assertion=strip(item.get("assertion", "")),
+                rule_value=strip(item.get("rule_value", "")),
                 verdict=verdict,
-                explanation=item.get("explanation", ""),
+                explanation=strip(item.get("explanation", "")),
                 source=source,
             )
         )
@@ -108,6 +115,57 @@ def _truncate_quote(quote: str, max_words: int = 14) -> str:
     if len(words) <= max_words:
         return quote
     return " ".join(words[:max_words])
+
+
+def _passage_ref_stripper(passages: list[Passage]):
+    """Return a function that scrubs internal passage IDs from user-facing text.
+
+    The verify LLM is given passages tagged with UUID `passage_id`s so it can pin
+    a source. Despite the prompt, models sometimes echo those IDs (or their short
+    prefixes) into the explanation, e.g. "Multiple passages (761e6aac, dbc92f59)
+    state...". Those hex codes are meaningless to a user, so strip the exact tokens
+    we handed the model, then tidy the enumeration/punctuation left behind.
+    """
+    tokens: set[str] = set()
+    for p in passages:
+        pid = p.passage_id or ""
+        if pid:
+            tokens.add(pid.lower())
+            head = pid.split("-", 1)[0]
+            if len(head) >= 6:
+                tokens.add(head.lower())
+
+    def strip(text: str) -> str:
+        if not text or not tokens:
+            return text
+        out = text
+        for tok in sorted(tokens, key=len, reverse=True):
+            out = re.sub(rf"\b{re.escape(tok)}\b", "", out, flags=re.IGNORECASE)
+        # Collapse the debris an ID enumeration leaves: "(e.g., , , )", "( , )",
+        # "(passage )", doubled/leading commas, and empty parens.
+        out = re.sub(
+            r"\(\s*(?:e\.g\.,?|i\.e\.,?|such as|passages?|ids?|codes?|refs?)?"
+            r"[\s:,]*(?:passages?|ids?)?\s*(?:,\s*)*\)",
+            "",
+            out,
+            flags=re.IGNORECASE,
+        )
+        # Parens left holding only conjunctions/filler, e.g. "( and )".
+        out = re.sub(
+            r"\(\s*(?:and|or|&|,|;|passages?|ids?)(?:[\s,;]+(?:and|or|&|passages?|ids?))*\s*\)",
+            "",
+            out,
+            flags=re.IGNORECASE,
+        )
+        out = re.sub(r"\s*,(\s*,)+", ",", out)
+        out = re.sub(r"\s+,", ",", out)
+        out = re.sub(r",\s*\)", ")", out)
+        out = re.sub(r"\(\s*,\s*", "(", out)
+        out = re.sub(r"\s{2,}", " ", out)
+        out = re.sub(r"\s+([.,;:])", r"\1", out)
+        return out.strip()
+
+    return strip
 
 
 def _unverifiable_fallback(

@@ -1,3 +1,4 @@
+import HeroDocument from './HeroDocument';
 import Logo from './Logo';
 import InstitutionsMarquee from './InstitutionsMarquee';
 
@@ -84,8 +85,8 @@ function NavLink({
 export default function LandingPage({ onGetStarted }: LandingPageProps) {
   return (
     <div className="font-brand min-h-screen bg-stone-100">
-      {/* Navbar */}
-      <header className="sticky top-0 z-50 px-4 pt-3 sm:px-6">
+      {/* Navbar — fixed over full-viewport hero */}
+      <header className="fixed top-0 left-0 right-0 z-50 px-4 pt-3 sm:px-6">
         <nav className="mx-auto flex max-w-5xl items-center justify-between rounded-full border border-white/60 bg-white/45 px-4 py-2 shadow-[0_2px_16px_rgba(28,25,23,0.06)] backdrop-blur-xl backdrop-saturate-150 sm:px-6">
           <Logo size="sm" />
           <div className="hidden items-center gap-7 md:flex">
@@ -103,14 +104,14 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
         </nav>
       </header>
 
-      {/* Hero */}
-      <section className="relative overflow-hidden">
+      {/* Hero — exactly one viewport tall */}
+      <section className="relative h-dvh min-h-dvh overflow-hidden">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(92,110,58,0.14),transparent)]"
         />
-        <div className="relative mx-auto max-w-6xl px-5 pb-20 pt-16 sm:px-8 sm:pb-28 sm:pt-24">
-          <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+        <div className="relative mx-auto flex h-full max-w-6xl items-center px-5 sm:px-8">
+          <div className="grid w-full items-center gap-10 py-20 lg:grid-cols-2 lg:gap-16 lg:py-24">
             <div className="animate-fade-up">
               <h1 className="text-4xl font-semibold leading-[1.1] tracking-[-0.02em] text-black sm:text-5xl lg:text-[3.25rem]">
                 They wrote the letter.
@@ -140,48 +141,8 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               </div>
             </div>
 
-            {/* Product preview mock */}
-            <div className="animate-fade-up-delay">
-              <div className="rounded-2xl border border-stone-200 bg-white p-1 shadow-xl shadow-stone-900/5">
-                <div className="rounded-xl bg-stone-50 p-5">
-                  <div className="mb-4 flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-                      Verification
-                    </span>
-                    <span className="rounded bg-red-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                      Mismatch
-                    </span>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                      <p className="text-sm font-medium text-stone-800">
-                        Notice period: 28 days
-                      </p>
-                      <p className="mt-1 text-xs text-stone-600">
-                        Statutory minimum for tenancies over 6 months is 90
-                        days.
-                      </p>
-                      <p className="receipt-quote mt-3 border-l-2 border-indigo-400 pl-3 text-xs text-stone-500">
-                        &ldquo;90 days notice is required&rdquo;
-                      </p>
-                      <p className="mt-1 text-[10px] text-indigo-600">
-                        citizensinformation.ie
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-stone-200 bg-white p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-                        Generated action
-                      </p>
-                      <p className="mt-1 text-sm font-medium text-stone-800">
-                        Appeal letter to landlord
-                      </p>
-                      <p className="mt-1 text-xs text-stone-500">
-                        Cites the 90-day rule and requests corrected notice…
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div className="animate-fade-up-delay flex h-full min-h-0 items-center justify-center lg:justify-end">
+              <HeroDocument />
             </div>
           </div>
         </div>

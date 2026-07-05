@@ -18,13 +18,13 @@ export default function Logo({ className = '', size = 'md' }: LogoProps) {
         alt=""
         aria-hidden
         draggable={false}
-        className={`block ${s.mark} w-auto shrink-0`}
+        className={`block ${s.mark} w-auto shrink-0 dark:brightness-0 dark:invert`}
       />
       <img
         src="/reywal-wordmark.png"
         alt="Reywal"
         draggable={false}
-        className={`block ${s.wordmark} w-auto translate-y-px`}
+        className={`block ${s.wordmark} w-auto translate-y-px dark:brightness-0 dark:invert`}
       />
     </div>
   );
