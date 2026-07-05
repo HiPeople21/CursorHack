@@ -11,6 +11,17 @@ class ProfileDecryptionError(Exception):
     """Raised when stored profile data cannot be decrypted."""
 
 
+# True once ensure_encryption_key() has had to generate a throwaway dev key
+# (i.e. no durable PROFILE_ENCRYPTION_KEY was configured). Health reporting uses
+# this so it doesn't advertise durable encryption backed by an ephemeral key.
+_ephemeral_key_generated = False
+
+
+def has_durable_encryption_key() -> bool:
+    """True when a configured (non-ephemeral) encryption key is in effect."""
+    return bool(os.getenv("PROFILE_ENCRYPTION_KEY", "").strip()) and not _ephemeral_key_generated
+
+
 def _fernet_key_bytes() -> bytes:
     if not os.getenv("PROFILE_ENCRYPTION_KEY", "").strip():
         ensure_encryption_key()
@@ -54,8 +65,10 @@ def ensure_encryption_key() -> None:
             'Generate one with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
         )
 
+    global _ephemeral_key_generated
     key = Fernet.generate_key().decode("utf-8")
     os.environ["PROFILE_ENCRYPTION_KEY"] = key
+    _ephemeral_key_generated = True
     print(
         "WARNING: PROFILE_ENCRYPTION_KEY was missing; generated an ephemeral dev key. "
         "Set PROFILE_ENCRYPTION_KEY in .env to persist profiles across restarts."
