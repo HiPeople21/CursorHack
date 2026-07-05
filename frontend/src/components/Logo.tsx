@@ -1,3 +1,5 @@
+import GhostIcon from './GhostIcon';
+
 interface LogoProps {
   className?: string;
   size?: 'sm' | 'md';
@@ -13,12 +15,8 @@ export default function Logo({ className = '', size = 'md' }: LogoProps) {
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <img
-        src="/reywal-mark.png"
-        alt=""
-        aria-hidden
-        draggable={false}
-        className={`block ${s.mark} w-auto shrink-0 dark:brightness-0 dark:invert`}
+      <GhostIcon
+        className={`block ${s.mark} w-auto shrink-0 text-indigo-600 dark:text-indigo-400`}
       />
       <img
         src="/reywal-wordmark.png"

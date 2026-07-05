@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Session } from '../types';
+import GhostIcon from './GhostIcon';
 
 interface SidebarProps {
   sessions: Session[];
@@ -158,13 +159,7 @@ export default function Sidebar({
             aria-label="Back to homepage"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition hover:bg-stone-100"
           >
-            <img
-              src="/reywal-mark.png"
-              alt=""
-              aria-hidden
-              draggable={false}
-              className="block h-8 w-8 object-contain"
-            />
+            <GhostIcon className="block h-8 w-8 text-indigo-600 dark:text-indigo-400" />
           </button>
           <img
             src="/reywal-wordmark.png"
@@ -314,21 +309,7 @@ export default function Sidebar({
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-stone-500"
           >
             {/* ghost glyph */}
-            <svg
-              className="h-4 w-4"
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              aria-hidden
-            >
-              <path
-                d="M4 16V9a6 6 0 0 1 12 0v7l-2-1.3-2 1.3-2-1.3-2 1.3L4 16Z"
-                strokeLinejoin="round"
-              />
-              <circle cx="8" cy="9" r="0.9" fill="currentColor" stroke="none" />
-              <circle cx="12" cy="9" r="0.9" fill="currentColor" stroke="none" />
-            </svg>
+            <GhostIcon variant="outline" className="h-4 w-4" />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold text-stone-800">

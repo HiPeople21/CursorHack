@@ -33,7 +33,13 @@ def verify(
                 '"verdict": "matches|mismatch|cannot_determine", "explanation": str, '
                 '"passage_id": str|null, "quote": str|null}]}. '
                 "quote must be <15 words verbatim from the passage. "
+                "rule_value must state what the passage actually says — never a figure, "
+                "statute, or section number recalled from memory. If the passages do not "
+                "state a rule for a fact, use cannot_determine, not prior knowledge. "
                 "No passage_id => unverifiable/cannot_determine. "
+                "Only compare a fact against a passage that genuinely governs the same "
+                "subject and jurisdiction; if the passages are about a different topic, "
+                "return cannot_determine rather than forcing a match. "
                 "Write statement and explanation for a layperson: describe what the "
                 "rule says in plain English. NEVER mention passage IDs, ID codes, or "
                 "hex strings in statement or explanation — cite the rule by what it says, "

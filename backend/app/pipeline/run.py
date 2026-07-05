@@ -159,7 +159,7 @@ def run_decode_stream(
 
     yield _running("act", "Drafting what you can do next…")
     try:
-        actions = act(doc_type, facts, verifications)
+        actions = act(doc_type, facts, verifications, bodies=bodies)
     except Exception:
         logger.exception("act failed")
     yield _done("act", f"Prepared {len(actions)} recommended action(s)")
