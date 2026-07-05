@@ -30,7 +30,10 @@ def summarize(text: str, doc_type: str, facts: list[ExtractedFact]) -> str:
         f"Document type: {doc_type}\n\nKey facts:\n{facts_block}\n\nDocument text:\n{text[:6000]}"
     )
 
-    data = qwen.chat_json(SYSTEM_PROMPT, user_prompt, mock_fixture="summarize.json")
+    try:
+        data = qwen.chat_json(SYSTEM_PROMPT, user_prompt, stage="summarize")
+    except Exception:
+        data = {}
 
     if isinstance(data, dict):
         summary = data.get("plain_summary")

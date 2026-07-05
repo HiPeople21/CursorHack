@@ -68,6 +68,10 @@ def _parse_verify_result(
         status = item.get("status", "unverifiable")
         if status not in ("supported", "contradicted", "unverifiable"):
             status = "unverifiable"
+        # Contract: a grounded verdict must carry a real Source. No source =>
+        # we cannot stand over "supported"/"contradicted", so downgrade.
+        if source is None:
+            status = "unverifiable"
         claims.append(
             Claim(statement=strip(item.get("statement", "")), status=status, source=source)
         )
@@ -77,6 +81,9 @@ def _parse_verify_result(
         source = _source_from_item(item, passage_by_id)
         verdict = item.get("verdict", "cannot_determine")
         if verdict not in ("matches", "mismatch", "cannot_determine"):
+            verdict = "cannot_determine"
+        # Same contract rule: no citation => cannot_determine.
+        if source is None:
             verdict = "cannot_determine"
         verifications.append(
             Verification(

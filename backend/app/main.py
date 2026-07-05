@@ -14,7 +14,7 @@ from starlette.responses import Response
 
 load_dotenv()
 
-from app.crypto import ensure_encryption_key  # noqa: E402
+from app.crypto import ensure_encryption_key, has_durable_encryption_key  # noqa: E402
 from app.db import Base, SessionLocal, engine  # noqa: E402  (import after load_dotenv)
 from app.pipeline.institution_seed import seed_institutions_from_fixture
 from app.routers import decode, lawyers, profile  # noqa: E402
@@ -72,7 +72,9 @@ def health() -> dict:
         "status": "ok",
         "demo_mode": demo_mode,
         "tls_enabled": tls_enabled,
-        "profile_encryption": bool(os.getenv("PROFILE_ENCRYPTION_KEY")),
+        # Only report durable encryption — not the ephemeral dev key that the
+        # demo bootstrap injects when no PROFILE_ENCRYPTION_KEY is configured.
+        "profile_encryption": has_durable_encryption_key(),
     }
 
 
