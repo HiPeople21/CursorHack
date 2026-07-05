@@ -4,6 +4,7 @@ import PasteBox from './components/PasteBox';
 import ResultView from './components/ResultView';
 import Sidebar from './components/Sidebar';
 import ProfilePanel, { PROFILE_ID_KEY } from './components/ProfilePanel';
+import PixelGhost from './components/PixelGhost';
 import { getHealth, getProfile } from './api/client';
 import { useSessions } from './hooks/useSessions';
 import { useDecodeRuns } from './hooks/useDecodeRuns';
@@ -89,7 +90,17 @@ function App({ onHome }: AppProps) {
         onToggleTheme={toggleTheme}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+      <div className="relative isolate flex min-w-0 flex-1 flex-col overflow-y-auto">
+        {/* Big pixel ghost drifting across the blue page background */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+        >
+          <div className="animate-ghost-drift absolute top-1/2 -translate-y-1/2">
+            <PixelGhost className="animate-ghost-hover h-64 w-auto text-indigo-500/15 sm:h-80" />
+          </div>
+        </div>
+
         {health?.demo_mode && (
           <div className="flex items-center justify-center gap-2 bg-indigo-800 px-4 py-1.5 text-center text-xs font-medium text-indigo-50">
             <span

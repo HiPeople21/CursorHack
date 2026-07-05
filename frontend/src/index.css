@@ -250,6 +250,24 @@ html.ghost {
     transform: scale(1);
   }
 }
+/* Big background ghost: drifts across the paste box, left to right, forever. */
+@keyframes ghost-drift {
+  0% {
+    left: -220px;
+  }
+  100% {
+    left: 100%;
+  }
+}
+@keyframes ghost-hover {
+  0%,
+  100% {
+    transform: translateY(-7px);
+  }
+  50% {
+    transform: translateY(7px);
+  }
+}
 
 @layer utilities {
   .animate-ghost-bob {
@@ -271,6 +289,12 @@ html.ghost {
   }
   .animate-word-in {
     animation: word-in 0.35s ease-out;
+  }
+  .animate-ghost-drift {
+    animation: ghost-drift 18s linear infinite;
+  }
+  .animate-ghost-hover {
+    animation: ghost-hover 3.2s ease-in-out infinite;
   }
 
   /* Shimmering buzzword: a highlight sweeps across the text. */
