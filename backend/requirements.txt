@@ -7,3 +7,7 @@ openai
 httpx
 cryptography
 pytest
+python-multipart
+pymupdf
+pillow
+pytesseract   # OCR; requires the `tesseract` system binary (macOS: brew install tesseract)

@@ -4,7 +4,7 @@ import asyncio
 import json
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -12,6 +12,7 @@ from app.db import get_db
 from app.jobs import Job, get_job, start_job
 from app.models import Document, SourceRow
 from app.persistence import persist_result
+from app.pipeline.ingest import ingest_document
 from app.pipeline.run import run_decode
 from app.schemas import (
     Action,
@@ -21,6 +22,7 @@ from app.schemas import (
     DecodeResult,
     ExtractedFact,
     Source,
+    UserProvidedInstitution,
     Verification,
 )
 
@@ -72,6 +74,96 @@ def decode(request: DecodeRequest, db: Session = Depends(get_db)) -> DecodeRespo
         return outcome
 
     doc = persist_result(outcome.result, request.text)
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+
+    return outcome
+
+
+@router.post("/decode/demo", response_model=DecodeResult)
+def decode_demo(db: Session = Depends(get_db)) -> DecodeResult:
+    """Offline "money demo": run the whole pipeline against the canned defective
+    RTB-notice fixtures — no network, no OCR binary, no request body. This is the
+    former DEMO_MODE, now an explicit endpoint instead of a global env flag.
+
+    Ingesting the fixture first gives us the exact source text the extract spans
+    are quoted from, so the returned facts keep their verbatim spans.
+    """
+    ingested = ingest_document(b"", "", "", demo=True)
+    outcome = run_decode(ingested.full_text_markdown, ingested.jurisdiction)
+    if outcome.result is None:
+        raise HTTPException(status_code=502, detail="Demo pipeline did not complete")
+    result = outcome.result
+    result.doc_type = ingested.doc_type or result.doc_type
+
+    doc = persist_result(result, ingested.full_text_markdown)
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+
+    return result
+
+
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
+_ALLOWED_EXTS = (".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".tif", ".tiff", ".bmp")
+
+
+@router.post("/decode/upload", response_model=DecodeResponse)
+async def decode_upload(
+    file: UploadFile = File(...),
+    jurisdiction: str = Form("IE"),
+    institution_body_id: str | None = Form(None),
+    institution_name: str | None = Form(None),
+    db: Session = Depends(get_db),
+) -> DecodeResponse:
+    """Upload an image or PDF of a document, ingest it to layout-preserving
+    markdown, then run the pipeline. Sibling of the JSON POST /api/decode.
+
+    Returns a DecodeResponse so the upload flow mirrors the paste flow: when no
+    governing body can be identified the response is ``needs_institution`` with a
+    prompt, and the client can re-upload with ``institution_body_id`` /
+    ``institution_name`` set to complete the decode.
+    """
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file")
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File too large (max 20 MB)")
+
+    ctype = (file.content_type or "").lower()
+    fname = file.filename or ""
+    allowed = (
+        ctype == "application/pdf"
+        or ctype.startswith("image/")
+        or fname.lower().endswith(_ALLOWED_EXTS)
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=415, detail=f"Unsupported file type: {ctype or fname or 'unknown'}"
+        )
+
+    try:
+        ingested = ingest_document(data, fname, ctype)
+    except Exception as exc:  # noqa: BLE001 — surface a clean 422, not a 500
+        raise HTTPException(status_code=422, detail=f"Could not read document: {exc}")
+
+    institution: UserProvidedInstitution | None = None
+    if institution_body_id or institution_name:
+        institution = UserProvidedInstitution(
+            body_id=institution_body_id or None,
+            display_name=institution_name or None,
+        )
+
+    outcome = run_decode(ingested.full_text_markdown, jurisdiction, institution)
+
+    if outcome.status != "complete" or outcome.result is None:
+        return outcome
+
+    # The vision ingest actually saw the document — trust its classification.
+    outcome.result.doc_type = ingested.doc_type or outcome.result.doc_type
+
+    doc = persist_result(outcome.result, ingested.full_text_markdown)
     db.add(doc)
     db.commit()
     db.refresh(doc)

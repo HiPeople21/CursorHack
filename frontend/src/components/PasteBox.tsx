@@ -9,6 +9,7 @@ interface Attachment {
   name: string;
   kind: 'image' | 'pdf';
   url: string; // object URL
+  file: File; // kept so we can upload it to /api/decode/upload
 }
 
 function attachmentKind(file: File): Attachment['kind'] | null {
@@ -24,6 +25,7 @@ interface PasteBoxProps {
   onTextChange: (text: string) => void;
   onJurisdictionChange: (jurisdiction: string) => void;
   onDecode: (institution?: UserProvidedInstitution | null) => void;
+  onUpload: (file: File, institution?: UserProvidedInstitution | null) => void;
 }
 
 const SAMPLE_TEXT = `NOTICE OF TERMINATION
@@ -52,6 +54,7 @@ export default function PasteBox({
   onTextChange,
   onJurisdictionChange,
   onDecode,
+  onUpload,
 }: PasteBoxProps) {
   // Decode state is owned by the app-level useDecodeRuns hook.
   const { loading, error, prompt, events } = run;
@@ -63,6 +66,9 @@ export default function PasteBox({
   const [fileError, setFileError] = useState<string | null>(null);
   const dragDepth = useRef(0);
   const fileInput = useRef<HTMLInputElement>(null);
+  // The file whose upload raised the current institution prompt, so answering
+  // the prompt re-runs the upload path (not the text-paste path).
+  const pendingFile = useRef<File | null>(null);
 
   // Release object URLs when the component unmounts.
   useEffect(() => {
@@ -88,7 +94,7 @@ export default function PasteBox({
     setFileError(null);
 
     const all = Array.from(files);
-    // Images and PDFs are shown as previews — never read as text.
+    // Images and PDFs are shown as previews and uploaded — never read as text.
     const previews = all
       .map((f) => {
         const kind = attachmentKind(f);
@@ -98,6 +104,7 @@ export default function PasteBox({
               name: f.name,
               kind,
               url: URL.createObjectURL(f),
+              file: f,
             }
           : null;
       })
@@ -152,9 +159,27 @@ export default function PasteBox({
     void ingestFiles(e.dataTransfer.files);
   }
 
+  // The first attached PDF/image is what gets sent to /api/decode/upload. When
+  // present it takes priority over any pasted text.
+  const uploadable = attachments[0] ?? null;
+  const canSubmit = !loading && (uploadable !== null || text.trim().length > 0);
+
+  // Route the institution prompt's answer back to whichever path raised it.
+  function continueWithInstitution(institution: UserProvidedInstitution) {
+    if (pendingFile.current) onUpload(pendingFile.current, institution);
+    else onDecode(institution);
+  }
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!text.trim() || loading) return;
+    if (loading) return;
+    if (uploadable) {
+      pendingFile.current = uploadable.file;
+      onUpload(uploadable.file);
+      return;
+    }
+    if (!text.trim()) return;
+    pendingFile.current = null;
     onDecode();
   }
 
@@ -357,10 +382,14 @@ export default function PasteBox({
 
         <button
           type="submit"
-          disabled={loading || !text.trim()}
+          disabled={!canSubmit}
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-stone-300"
         >
-          {loading ? 'Decoding…' : 'Decode this document'}
+          {loading
+            ? 'Decoding…'
+            : uploadable
+              ? 'Decode this file'
+              : 'Decode this document'}
         </button>
       </div>
 
@@ -378,7 +407,7 @@ export default function PasteBox({
                   key={s.body_id}
                   type="button"
                   disabled={loading}
-                  onClick={() => onDecode({ body_id: s.body_id })}
+                  onClick={() => continueWithInstitution({ body_id: s.body_id })}
                   className="rounded-lg border border-amber-300 bg-surface px-3 py-1.5 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
                 >
                   {s.display_name}
@@ -397,7 +426,9 @@ export default function PasteBox({
             <button
               type="button"
               disabled={loading || institutionText.trim() === ''}
-              onClick={() => onDecode({ display_name: institutionText.trim() })}
+              onClick={() =>
+                continueWithInstitution({ display_name: institutionText.trim() })
+              }
               className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-stone-300"
             >
               Continue

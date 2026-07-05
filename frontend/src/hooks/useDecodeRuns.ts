@@ -6,7 +6,7 @@ import type {
   InstitutionPrompt,
   UserProvidedInstitution,
 } from '../types';
-import { decodeStream, resumeDecodeStream } from '../api/client';
+import { decodeStream, resumeDecodeStream, uploadDocument } from '../api/client';
 
 // Per-session decode state. Lives at the App level (not inside PasteBox) so that
 // switching sessions — e.g. clicking "New document" mid-decode — never unmounts
@@ -109,6 +109,35 @@ export function useDecodeRuns(
     [applyResponse, fail, onDecodingChange, pushEvent]
   );
 
+  // Upload a PDF/image and decode it. This path is a single request (not the
+  // resumable SSE job), so it doesn't survive a refresh — but it shares the same
+  // app-level run state, prompt handling, and result wiring as startDecode.
+  const uploadDecode = useCallback(
+    async (
+      sessionId: string,
+      file: File,
+      jurisdiction?: string,
+      institution?: UserProvidedInstitution | null
+    ) => {
+      if (inFlight.current.has(sessionId)) return;
+      inFlight.current.add(sessionId);
+      setRuns((prev) => ({
+        ...prev,
+        [sessionId]: { loading: true, events: [], error: null, prompt: null },
+      }));
+      onDecodingChange(sessionId, true);
+      try {
+        const response = await uploadDocument(file, jurisdiction, institution);
+        applyResponse(sessionId, response);
+      } catch (err) {
+        fail(sessionId, err instanceof Error ? err.message : 'Could not read that file.');
+      } finally {
+        inFlight.current.delete(sessionId);
+      }
+    },
+    [applyResponse, fail, onDecodingChange]
+  );
+
   // Reconnect to a job that was already running (used after a page refresh).
   const resumeDecode = useCallback(
     async (sessionId: string) => {
@@ -143,5 +172,5 @@ export function useDecodeRuns(
 
   const loadingIds = Object.keys(runs).filter((id) => runs[id].loading);
 
-  return { getRun, startDecode, resumeDecode, loadingIds };
+  return { getRun, startDecode, uploadDecode, resumeDecode, loadingIds };
 }

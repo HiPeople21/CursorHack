@@ -54,6 +54,41 @@ export async function decode(
   return (await res.json()) as DecodeResponse;
 }
 
+export async function uploadDocument(
+  file: File,
+  jurisdiction?: string,
+  institution?: UserProvidedInstitution | null
+): Promise<DecodeResponse> {
+  if (USE_MOCK) {
+    return delay({
+      status: 'complete',
+      institution_prompt: null,
+      result: { ...sampleResult, jurisdiction: jurisdiction || sampleResult.jurisdiction },
+      lawyer_referral_eligible: false,
+      lawyer_referral_reason: '',
+    });
+  }
+
+  const form = new FormData();
+  form.append('file', file);
+  form.append('jurisdiction', jurisdiction || 'IE');
+  if (institution?.body_id) form.append('institution_body_id', institution.body_id);
+  if (institution?.display_name)
+    form.append('institution_name', institution.display_name);
+
+  // No Content-Type header — the browser sets the multipart boundary itself.
+  const res = await fetch('/api/decode/upload', {
+    method: 'POST',
+    body: form,
+  });
+
+  if (!res.ok) {
+    throw new Error(`upload failed: ${await readError(res)}`);
+  }
+
+  return (await res.json()) as DecodeResponse;
+}
+
 // Ordered (stage, running-label, done-detail) tuples used to fake a live
 // pipeline in mock mode so the ThinkingPanel looks identical to the real thing.
 const MOCK_STEPS: Array<[DecodeProgressEvent['stage'], string, string]> = [
