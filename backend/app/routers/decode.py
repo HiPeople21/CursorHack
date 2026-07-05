@@ -1,21 +1,18 @@
 """POST /api/decode and the history GET endpoints."""
 
+import asyncio
 import json
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import (
-    ActionRow,
-    ClaimRow,
-    Document,
-    ExtractedFactRow,
-    SourceRow,
-    VerificationRow,
-)
-from app.pipeline.run import run_decode, run_decode_stream
+from app.jobs import Job, get_job, start_job
+from app.models import Document, SourceRow
+from app.persistence import persist_result
+from app.pipeline.run import run_decode
 from app.schemas import (
     Action,
     Claim,
@@ -28,77 +25,6 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/api", tags=["decode"])
-
-
-def _persist(result: DecodeResult, raw_text: str) -> Document:
-    """Write a DecodeResult (and its nested children) to SQLite.
-
-    Uses the DecodeResult's own id as the documents.id primary key so the
-    stored row and the returned payload agree.
-    """
-    doc = Document(
-        id=result.id,
-        raw_text=raw_text,
-        doc_type=result.doc_type,
-        jurisdiction=result.jurisdiction,
-        plain_summary=result.plain_summary,
-        disclaimer=result.disclaimer,
-    )
-
-    def _make_source_row(source: Source | None) -> SourceRow | None:
-        if source is None:
-            return None
-        row = SourceRow(
-            document_id=doc.id,
-            url=source.url,
-            title=source.title,
-            quote=source.quote,
-            retrieved_at=source.retrieved_at,
-        )
-        doc.sources.append(row)
-        return row
-
-    for fact in result.extracted_facts:
-        doc.extracted_facts.append(
-            ExtractedFactRow(document_id=doc.id, key=fact.key, value=fact.value, span=fact.span)
-        )
-
-    for claim in result.claims:
-        source_row = _make_source_row(claim.source)
-        doc.claims.append(
-            ClaimRow(
-                document_id=doc.id,
-                statement=claim.statement,
-                status=claim.status,
-                source=source_row,
-            )
-        )
-
-    for verification in result.verification:
-        source_row = _make_source_row(verification.source)
-        doc.verifications.append(
-            VerificationRow(
-                document_id=doc.id,
-                assertion=verification.assertion,
-                rule_value=verification.rule_value,
-                verdict=verification.verdict,
-                explanation=verification.explanation,
-                source=source_row,
-            )
-        )
-
-    for action in result.actions:
-        doc.actions.append(
-            ActionRow(
-                document_id=doc.id,
-                title=action.title,
-                kind=action.kind,
-                body=action.body,
-                deadline=action.deadline,
-            )
-        )
-
-    return doc
 
 
 def _source_to_schema(row: SourceRow | None) -> Source | None:
@@ -145,7 +71,7 @@ def decode(request: DecodeRequest, db: Session = Depends(get_db)) -> DecodeRespo
     if outcome.status != "complete" or outcome.result is None:
         return outcome
 
-    doc = _persist(outcome.result, request.text)
+    doc = persist_result(outcome.result, request.text)
     db.add(doc)
     db.commit()
     db.refresh(doc)
@@ -153,46 +79,61 @@ def decode(request: DecodeRequest, db: Session = Depends(get_db)) -> DecodeRespo
     return outcome
 
 
-@router.post("/decode/stream")
-def decode_stream(request: DecodeRequest, db: Session = Depends(get_db)) -> StreamingResponse:
-    """Server-Sent Events variant of /decode.
+_SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+}
 
-    Emits one JSON frame per pipeline stage so the client can show progress in
-    real time, then a terminal frame carrying the full DecodeResponse. The
-    completed result is persisted before the terminal frame is sent, matching
-    the behaviour of the blocking /decode endpoint.
+
+async def _tail_job(job: Job):
+    """Yield SSE frames for a job: replay buffered events, then stream live ones.
+
+    Because the job runs in its own thread, a disconnecting client (browser
+    refresh) does not stop the work — a later reconnect replays from index 0 and
+    continues until the terminal frame.
     """
-
-    def event_stream():
-        for event in run_decode_stream(
-            request.text, request.jurisdiction, request.institution
-        ):
-            response: DecodeResponse | None = event.get("response")
-            if response is not None:
-                if response.status == "complete" and response.result is not None:
-                    try:
-                        doc = _persist(response.result, request.text)
-                        db.add(doc)
-                        db.commit()
-                    except Exception:
-                        db.rollback()
-                frame = {
-                    "stage": event["stage"],
-                    "status": event["status"],
-                    "response": response.model_dump(),
-                }
-            else:
-                frame = event
+    index = 0
+    while True:
+        new_events, done = job.snapshot(index)
+        for frame in new_events:
             yield f"data: {json.dumps(frame)}\n\n"
+        index += len(new_events)
+        if done and not new_events:
+            break
+        await asyncio.sleep(0.15)
 
+
+@router.post("/decode/stream")
+def decode_stream(
+    request: DecodeRequest, job_id: str | None = None
+) -> StreamingResponse:
+    """Start a decode job and stream its progress as Server-Sent Events.
+
+    The job runs in a background thread and persists its result independently of
+    this connection, so the client can disconnect (refresh) and later reconnect
+    via GET /decode/stream/{job_id}. Pass a stable job_id (the client uses its
+    session id) to make reconnection possible.
+    """
+    resolved_id = job_id or str(uuid.uuid4())
+    job = start_job(resolved_id, request.text, request.jurisdiction, request.institution)
     return StreamingResponse(
-        event_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
+        _tail_job(job), media_type="text/event-stream", headers=_SSE_HEADERS
+    )
+
+
+@router.get("/decode/stream/{job_id}")
+def resume_decode_stream(job_id: str) -> StreamingResponse:
+    """Reconnect to an in-flight or recently finished decode job.
+
+    Replays all buffered progress events, then streams any remaining ones. 404
+    if the job is unknown (never started, or lost to a server restart / TTL).
+    """
+    job = get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Decode job not found")
+    return StreamingResponse(
+        _tail_job(job), media_type="text/event-stream", headers=_SSE_HEADERS
     )
 
 

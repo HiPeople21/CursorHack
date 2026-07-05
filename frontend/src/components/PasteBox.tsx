@@ -1,12 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DragEvent, FormEvent } from 'react';
-import type {
-  DecodeProgressEvent,
-  DecodeResult,
-  InstitutionPrompt,
-  UserProvidedInstitution,
-} from '../types';
-import { decodeStream } from '../api/client';
+import type { UserProvidedInstitution } from '../types';
+import type { DecodeRun } from '../hooks/useDecodeRuns';
 import ThinkingPanel from './ThinkingPanel';
 
 interface Attachment {
@@ -25,9 +20,10 @@ function attachmentKind(file: File): Attachment['kind'] | null {
 interface PasteBoxProps {
   text: string;
   jurisdiction: string;
+  run: DecodeRun;
   onTextChange: (text: string) => void;
   onJurisdictionChange: (jurisdiction: string) => void;
-  onResult: (result: DecodeResult) => void;
+  onDecode: (institution?: UserProvidedInstitution | null) => void;
 }
 
 const SAMPLE_TEXT = `NOTICE OF TERMINATION
@@ -52,18 +48,19 @@ const JURISDICTIONS = [
 export default function PasteBox({
   text,
   jurisdiction,
+  run,
   onTextChange,
   onJurisdictionChange,
-  onResult,
+  onDecode,
 }: PasteBoxProps) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [prompt, setPrompt] = useState<InstitutionPrompt | null>(null);
+  // Decode state is owned by the app-level useDecodeRuns hook.
+  const { loading, error, prompt, events } = run;
+
   const [institutionText, setInstitutionText] = useState('');
-  const [events, setEvents] = useState<DecodeProgressEvent[]>([]);
   const [dragging, setDragging] = useState(false);
   const [dropped, setDropped] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [fileError, setFileError] = useState<string | null>(null);
   const dragDepth = useRef(0);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -81,9 +78,14 @@ export default function PasteBox({
     });
   }
 
+  function bounce() {
+    setDropped(true);
+    window.setTimeout(() => setDropped(false), 550);
+  }
+
   async function ingestFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
-    setError(null);
+    setFileError(null);
 
     const all = Array.from(files);
     // Images and PDFs are shown as previews — never read as text.
@@ -116,19 +118,14 @@ export default function PasteBox({
           onTextChange(joined);
           bounce();
         } else if (previews.length === 0) {
-          setError('That file looks empty — try a plain-text document.');
+          setFileError('That file looks empty — try a plain-text document.');
         }
       } catch {
-        setError(
+        setFileError(
           'Could not read that file. Paste the text instead, or try a .txt file.'
         );
       }
     }
-  }
-
-  function bounce() {
-    setDropped(true);
-    window.setTimeout(() => setDropped(false), 550);
   }
 
   function handleDragEnter(e: DragEvent) {
@@ -155,46 +152,10 @@ export default function PasteBox({
     void ingestFiles(e.dataTransfer.files);
   }
 
-  async function submit(institution?: UserProvidedInstitution | null) {
-    if (!text.trim() || loading) return;
-    setLoading(true);
-    setError(null);
-    setEvents([]);
-    try {
-      const response = await decodeStream(
-        text,
-        (event) => setEvents((prev) => [...prev, event]),
-        jurisdiction || undefined,
-        institution
-      );
-      if (response.status === 'needs_institution') {
-        setPrompt(response.institution_prompt);
-        return;
-      }
-      if (response.result) {
-        setPrompt(null);
-        setInstitutionText('');
-        onResult(response.result);
-        return;
-      }
-      // Reached only if the server returns a shape we don't understand
-      // (e.g. a stale backend on the old contract). Fail loudly rather than
-      // leaving the user staring at a spinner that silently resolved.
-      setError(
-        'The server returned an unexpected response. It may be running an ' +
-          'older version — try restarting the backend and decoding again.'
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setPrompt(null);
-    void submit();
+    if (!text.trim() || loading) return;
+    onDecode();
   }
 
   return (
@@ -365,6 +326,12 @@ export default function PasteBox({
         .
       </p>
 
+      {fileError && (
+        <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          {fileError}
+        </p>
+      )}
+
       <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
           <span>Jurisdiction:</span>
@@ -411,7 +378,7 @@ export default function PasteBox({
                   key={s.body_id}
                   type="button"
                   disabled={loading}
-                  onClick={() => void submit({ body_id: s.body_id })}
+                  onClick={() => onDecode({ body_id: s.body_id })}
                   className="rounded-lg border border-amber-300 bg-surface px-3 py-1.5 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
                 >
                   {s.display_name}
@@ -430,9 +397,7 @@ export default function PasteBox({
             <button
               type="button"
               disabled={loading || institutionText.trim() === ''}
-              onClick={() =>
-                void submit({ display_name: institutionText.trim() })
-              }
+              onClick={() => onDecode({ display_name: institutionText.trim() })}
               className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-stone-300"
             >
               Continue

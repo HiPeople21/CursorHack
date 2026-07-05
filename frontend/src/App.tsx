@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { HealthStatus, UserProfile } from './types';
 import PasteBox from './components/PasteBox';
 import ResultView from './components/ResultView';
@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar';
 import ProfilePanel, { PROFILE_ID_KEY } from './components/ProfilePanel';
 import { getHealth, getProfile } from './api/client';
 import { useSessions } from './hooks/useSessions';
+import { useDecodeRuns } from './hooks/useDecodeRuns';
 import { useTheme } from './hooks/useTheme';
 
 function App() {
@@ -20,7 +21,13 @@ function App() {
     setText,
     setJurisdiction,
     setResult,
+    setDecoding,
   } = useSessions();
+
+  const { getRun, startDecode, resumeDecode, loadingIds } = useDecodeRuns(
+    setResult,
+    setDecoding
+  );
 
   const { isGhost, toggle: toggleTheme } = useTheme();
   const [profileOpen, setProfileOpen] = useState(false);
@@ -47,6 +54,17 @@ function App() {
       .catch(() => setHealth(null));
   }, []);
 
+  // Reconnect to any decode that was in flight when the page was refreshed.
+  // The job kept running on the server; we replay its progress and finish it.
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    if (resumedRef.current) return;
+    resumedRef.current = true;
+    for (const s of sessions) {
+      if (s.decoding && !s.result) void resumeDecode(s.id);
+    }
+  }, [sessions, resumeDecode]);
+
   const result = active?.result ?? null;
 
   return (
@@ -60,6 +78,7 @@ function App() {
         onRename={rename}
         onOpenProfile={() => setProfileOpen(true)}
         profileName={profile?.full_name ?? null}
+        loadingIds={loadingIds}
         isGhost={isGhost}
         onToggleTheme={toggleTheme}
       />
@@ -99,9 +118,17 @@ function App() {
               key={active.id}
               text={active.text}
               jurisdiction={active.jurisdiction}
+              run={getRun(active.id)}
               onTextChange={(t) => setText(active.id, t)}
               onJurisdictionChange={(j) => setJurisdiction(active.id, j)}
-              onResult={(r) => setResult(active.id, r)}
+              onDecode={(institution) =>
+                startDecode(
+                  active.id,
+                  active.text,
+                  active.jurisdiction || undefined,
+                  institution
+                )
+              }
             />
           )}
 

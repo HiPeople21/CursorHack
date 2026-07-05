@@ -127,6 +127,11 @@ export function useSessions() {
     [patch]
   );
 
+  const setDecoding = useCallback(
+    (id: string, decoding: boolean) => patch(id, { decoding }),
+    [patch]
+  );
+
   const create = useCallback(() => {
     const s = newSession();
     setSessions((prev) => [s, ...prev]);
@@ -152,5 +157,6 @@ export function useSessions() {
     setText,
     setJurisdiction,
     setResult,
+    setDecoding,
   };
 }

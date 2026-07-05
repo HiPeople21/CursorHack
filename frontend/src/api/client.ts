@@ -67,11 +67,60 @@ const MOCK_STEPS: Array<[DecodeProgressEvent['stage'], string, string]> = [
   ['refer', 'Checking whether a lawyer referral applies…', 'No lawyer referral needed'],
 ];
 
+// Reads an SSE response body, invoking `onEvent` per frame. Returns the final
+// DecodeResponse (from a terminal frame) or null if the stream ended without
+// one. Throws if the server emitted an explicit error frame.
+async function readSse(
+  res: Response,
+  onEvent: (event: DecodeProgressEvent) => void
+): Promise<DecodeResponse | null> {
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let final: DecodeResponse | null = null;
+  let errorDetail: string | null = null;
+
+  const handleFrame = (raw: string) => {
+    // An SSE frame is one or more "data: ..." lines; we only send single-line
+    // JSON payloads, but concatenate defensively.
+    const data = raw
+      .split('\n')
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trim())
+      .join('');
+    if (!data) return;
+    const event = JSON.parse(data) as DecodeProgressEvent;
+    onEvent(event);
+    if (event.response) final = event.response;
+    if (event.stage === ('error' as DecodeProgressEvent['stage'])) {
+      errorDetail = event.detail ?? 'The decode failed on the server.';
+    }
+  };
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep: number;
+    while ((sep = buffer.indexOf('\n\n')) !== -1) {
+      const frame = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      if (frame.trim()) handleFrame(frame);
+    }
+  }
+  if (buffer.trim()) handleFrame(buffer);
+
+  if (errorDetail) throw new Error(errorDetail);
+  return final;
+}
+
 /**
- * Streaming decode. Calls `onEvent` for each pipeline progress event and
- * resolves with the final DecodeResponse (from the terminal event).
+ * Start a decode job and stream its progress. `sessionId` is used as the server
+ * job id so the run can be reconnected to after a page refresh. Resolves with
+ * the final DecodeResponse.
  */
 export async function decodeStream(
+  sessionId: string,
   text: string,
   onEvent: (event: DecodeProgressEvent) => void,
   jurisdiction?: string,
@@ -98,7 +147,7 @@ export async function decodeStream(
   if (jurisdiction) payload.jurisdiction = jurisdiction;
   if (institution) payload.institution = institution;
 
-  const res = await fetch('/api/decode/stream', {
+  const res = await fetch(`/api/decode/stream?job_id=${encodeURIComponent(sessionId)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -108,38 +157,7 @@ export async function decodeStream(
     throw new Error(`decode request failed: ${await readError(res)}`);
   }
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let final: DecodeResponse | null = null;
-
-  const handleFrame = (raw: string) => {
-    // An SSE frame is one or more "data: ..." lines; we only send single-line
-    // JSON payloads, but concatenate defensively.
-    const data = raw
-      .split('\n')
-      .filter((line) => line.startsWith('data:'))
-      .map((line) => line.slice(5).trim())
-      .join('');
-    if (!data) return;
-    const event = JSON.parse(data) as DecodeProgressEvent;
-    onEvent(event);
-    if (event.response) final = event.response;
-  };
-
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let sep: number;
-    while ((sep = buffer.indexOf('\n\n')) !== -1) {
-      const frame = buffer.slice(0, sep);
-      buffer = buffer.slice(sep + 2);
-      if (frame.trim()) handleFrame(frame);
-    }
-  }
-  if (buffer.trim()) handleFrame(buffer);
-
+  const final = await readSse(res, onEvent);
   if (!final) {
     throw new Error(
       'The server closed the stream without a final result. It may be running ' +
@@ -147,6 +165,26 @@ export async function decodeStream(
     );
   }
   return final;
+}
+
+/**
+ * Reconnect to a decode job started earlier (e.g. before a page refresh),
+ * replaying its progress and streaming until it finishes. Returns the final
+ * DecodeResponse, or null if the job is gone (server never had it, restarted,
+ * or it expired) so the caller can prompt the user to re-run.
+ */
+export async function resumeDecodeStream(
+  sessionId: string,
+  onEvent: (event: DecodeProgressEvent) => void
+): Promise<DecodeResponse | null> {
+  if (USE_MOCK) return null; // no server-side job to reconnect to
+
+  const res = await fetch(`/api/decode/stream/${encodeURIComponent(sessionId)}`);
+  if (res.status === 404) return null;
+  if (!res.ok || !res.body) {
+    throw new Error(`resume request failed: ${await readError(res)}`);
+  }
+  return readSse(res, onEvent);
 }
 
 // --- History ---

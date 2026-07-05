@@ -10,6 +10,7 @@ interface SidebarProps {
   onRename: (id: string, title: string) => void;
   onOpenProfile: () => void;
   profileName: string | null;
+  loadingIds: string[];
   isGhost: boolean;
   onToggleTheme: () => void;
 }
@@ -38,9 +39,11 @@ export default function Sidebar({
   onRename,
   onOpenProfile,
   profileName,
+  loadingIds,
   isGhost,
   onToggleTheme,
 }: SidebarProps) {
+  const loadingSet = new Set(loadingIds);
   const [menu, setMenu] = useState<ContextMenu | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -130,6 +133,7 @@ export default function Sidebar({
         <ul className="space-y-0.5">
           {sessions.map((s) => {
             const isActive = s.id === activeId;
+            const isLoading = loadingSet.has(s.id);
             return (
               <li key={s.id}>
                 <div
@@ -140,10 +144,18 @@ export default function Sidebar({
                       : 'text-stone-600 hover:bg-stone-100'
                   }`}
                 >
-                  <span
-                    aria-hidden
-                    className={`h-2 w-2 shrink-0 rounded-full ${verdictDot(s)}`}
-                  />
+                  {isLoading ? (
+                    <span
+                      aria-hidden
+                      title="Decoding…"
+                      className="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-indigo-300 border-t-indigo-600"
+                    />
+                  ) : (
+                    <span
+                      aria-hidden
+                      className={`h-2 w-2 shrink-0 rounded-full ${verdictDot(s)}`}
+                    />
+                  )}
                   {editingId === s.id ? (
                     <input
                       ref={inputRef}

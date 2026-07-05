@@ -202,6 +202,9 @@ export interface Session {
   text: string;
   jurisdiction: string;
   result: DecodeResult | null;
+  // True while a server-side decode job is running for this session. Persisted
+  // so a page refresh can reconnect to the job (job_id === session id).
+  decoding?: boolean;
   createdAt: string;
   updatedAt: string;
   renamed?: boolean; // user set the title manually — don't auto-derive from text
