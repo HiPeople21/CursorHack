@@ -16,6 +16,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.clients.config import is_demo_mode
 from app.db import SessionLocal
 from app.persistence import persist_result
 from app.pipeline.ingest import ingest_document
@@ -166,7 +167,11 @@ def _run_upload_job(
             {"stage": "ingest", "status": "running", "label": "Reading your file…"}
         )
         try:
-            ingested = ingest_document(data, filename, content_type)
+            # DEMO_MODE uses the canned ingest fixture so upload works offline
+            # without a Tesseract binary; live mode does real OCR/vision.
+            ingested = ingest_document(
+                data, filename, content_type, demo=is_demo_mode()
+            )
         except Exception as exc:  # noqa: BLE001 — surface a clean error frame
             logger.exception("upload job %s ingest failed", job.id)
             job.append(

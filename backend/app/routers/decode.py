@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from app.clients.config import is_demo_mode
 from app.db import get_db
 from app.jobs import Job, get_job, start_job, start_upload_job
 from app.models import Document, SourceRow
@@ -161,7 +162,12 @@ async def decode_upload(
     data = await _read_validated_upload(file)
 
     try:
-        ingested = ingest_document(data, file.filename or "", (file.content_type or "").lower())
+        ingested = ingest_document(
+            data,
+            file.filename or "",
+            (file.content_type or "").lower(),
+            demo=is_demo_mode(),
+        )
     except Exception as exc:  # noqa: BLE001 — surface a clean 422, not a 500
         raise HTTPException(status_code=422, detail=f"Could not read document: {exc}")
 
