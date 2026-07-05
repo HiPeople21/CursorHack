@@ -17,7 +17,7 @@ const VERDICT_META: Record<
   },
   matches: {
     label: 'Matches',
-    card: 'border-stone-200 bg-white',
+    card: 'border-stone-200 bg-surface',
     badge: 'bg-emerald-100 text-emerald-800',
     icon: '✓',
   },

@@ -1,0 +1,31 @@
+{
+  "referrals": [
+    {
+      "name": "Sarah O'Brien",
+      "firm": "O'Brien & Associates Solicitors",
+      "practice_area": "tenancy and landlord-tenant law",
+      "location": "Dublin, Ireland",
+      "url": "https://www.lawsociety.ie/find-a-solicitor/",
+      "phone": "+353 1 234 5678",
+      "reason": "Specialises in RTB disputes and residential tenancy termination notices."
+    },
+    {
+      "name": "Michael Walsh",
+      "firm": "Walsh Housing Law",
+      "practice_area": "tenancy and landlord-tenant law",
+      "location": "Cork, Ireland",
+      "url": "https://www.lawsociety.ie/find-a-solicitor/",
+      "phone": "+353 21 456 7890",
+      "reason": "Experienced in tenant rights and defective notice period challenges."
+    },
+    {
+      "name": "Aoife Murphy",
+      "firm": "Murphy Legal",
+      "practice_area": "tenancy and landlord-tenant law",
+      "location": "Galway, Ireland",
+      "url": "https://www.flac.ie/legal-info/housing/",
+      "phone": null,
+      "reason": "Free Legal Advice Centre referral for housing disputes when private counsel is not affordable."
+    }
+  ]
+}

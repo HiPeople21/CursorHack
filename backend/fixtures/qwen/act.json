@@ -1,0 +1,22 @@
+{
+  "actions": [
+    {
+      "title": "Appeal letter to landlord",
+      "kind": "letter",
+      "body": "Dear Kelly Properties Ltd,\n\nI am writing regarding the Notice of Termination dated 1 June 2026, which requires me to vacate the property within 14 days.\n\nMy tenancy commenced on 1 March 2021 and has therefore lasted more than 3 years. Under the rules published by Citizens Information (citing the Residential Tenancies Acts), a tenancy that has lasted 3 years or more requires a minimum notice period of 90 days, not 14.\n\nAs the notice period given falls well short of the statutory minimum, I consider this Notice of Termination invalid. I do not intend to vacate the property on the basis of this notice and reserve my right to refer this matter to the Residential Tenancies Board (RTB) if it is not corrected.\n\nPlease reissue a valid notice, or confirm that this notice is withdrawn.\n\nYours sincerely,\n[Your name]",
+      "deadline": null
+    },
+    {
+      "title": "Deadline stated in the notice",
+      "kind": "deadline",
+      "body": "The notice as issued states you must vacate within 14 days of its date (1 June 2026). This deadline is disputed because the statutory minimum notice period for your tenancy length is 90 days — do not treat 14 days as binding without first challenging the notice.",
+      "deadline": "2026-06-15"
+    },
+    {
+      "title": "Contact the RTB",
+      "kind": "contact",
+      "body": "If your landlord does not withdraw or correct the notice, you can refer a dispute to the Residential Tenancies Board (RTB) at www.rtb.ie or 0818 30 30 37.",
+      "deadline": null
+    }
+  ]
+}

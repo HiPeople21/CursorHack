@@ -61,7 +61,123 @@ export interface DecodeResult {
   disclaimer: string;
 }
 
+export interface UserProvidedInstitution {
+  body_id?: string | null; // registry slug, e.g. "rtb" or "IE:rtb"
+  display_name?: string | null; // free text when slug is unknown
+}
+
 export interface DecodeRequest {
   text: string;
-  jurisdiction?: string; // defaults to "IE"
+  jurisdiction?: string; // auto-detected from document when omitted
+  institution?: UserProvidedInstitution | null;
+}
+
+export interface InstitutionSuggestion {
+  body_id: string;
+  display_name: string;
+}
+
+export interface InstitutionPrompt {
+  message: string;
+  field: string; // defaults to "institution"
+  suggestions: InstitutionSuggestion[];
+}
+
+// POST /api/decode returns this wrapper, not a bare DecodeResult.
+export interface DecodeResponse {
+  status: 'complete' | 'needs_institution';
+  institution_prompt: InstitutionPrompt | null;
+  result: DecodeResult | null;
+  lawyer_referral_eligible?: boolean;
+  lawyer_referral_reason?: string;
+}
+
+// --- Lawyer referrals (standalone endpoint — not on DecodeResult) ---
+
+export interface LawyerReferral {
+  name: string;
+  firm: string;
+  practice_area: string;
+  location: string;
+  url: string | null;
+  phone: string | null;
+  reason: string;
+}
+
+export interface LawyerSearchLocation {
+  city?: string | null;
+  county?: string | null;
+  jurisdiction?: string | null;
+}
+
+export interface LawyerRecommendRequest {
+  doc_type?: DocType;
+  jurisdiction?: string;
+  location?: LawyerSearchLocation | null;
+  profile_id?: string | null;
+  plain_summary?: string;
+  extracted_facts?: ExtractedFact[];
+  claims?: Claim[];
+  verification?: Verification[];
+}
+
+export interface LawyerRecommendResponse {
+  referrals: LawyerReferral[];
+  eligible: boolean;
+  reason: string;
+}
+
+// GET /api/health
+export interface HealthStatus {
+  status: string;
+  demo_mode: boolean;
+  tls_enabled: boolean;
+  profile_encryption: boolean;
+}
+
+// --- Profile (autofill) — mirrors UserProfile in schemas.py ---
+
+export interface UserProfile {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  address_line1: string;
+  address_line2: string | null;
+  city: string;
+  county: string;
+  eircode: string | null;
+  date_of_birth: string | null; // ISO date YYYY-MM-DD
+  pps_number: string | null;
+  jurisdiction: string;
+  extra: Record<string, string>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserProfileInput {
+  full_name: string;
+  email?: string | null;
+  phone?: string | null;
+  address_line1?: string;
+  address_line2?: string | null;
+  city?: string;
+  county?: string;
+  eircode?: string | null;
+  date_of_birth?: string | null;
+  pps_number?: string | null;
+  jurisdiction?: string;
+  extra?: Record<string, string>;
+}
+
+// --- Client-side only: a "chat" is one pasted document + its decode ---
+
+export interface Session {
+  id: string;
+  title: string;
+  text: string;
+  jurisdiction: string;
+  result: DecodeResult | null;
+  createdAt: string;
+  updatedAt: string;
 }

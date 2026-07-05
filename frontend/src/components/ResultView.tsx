@@ -19,7 +19,7 @@ export default function ResultView({ result }: ResultViewProps) {
   return (
     <div className="space-y-8">
       {/* Summary */}
-      <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+      <section className="rounded-2xl border border-stone-200 bg-surface p-5 shadow-sm sm:p-6">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <span className="inline-flex rounded-full bg-stone-900 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
             {DOC_TYPE_LABEL[result.doc_type] ?? result.doc_type}

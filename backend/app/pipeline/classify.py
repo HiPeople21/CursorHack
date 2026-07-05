@@ -1,57 +1,67 @@
-"""Stage 1 — classify: (text) -> (doc_type, jurisdiction).
+"""Stage 1: classify document type and jurisdiction."""
 
-No LLM for now. When ``demo`` is set we return the canned fixture; live we use a
-light keyword heuristic over the (OCR'd) text. Swap in a real model later.
-"""
+from typing import Literal
 
-import re
+from app.clients.qwen import chat_json
+from app.pipeline.jurisdiction import infer_jurisdiction_from_text, normalize_jurisdiction
 
-from app.pipeline.util import load_fixture
-
-DOC_TYPES = ("tenancy", "insurance", "medical_bill", "gov_letter", "other")
-
-# Lowercase keyword cues per document type, checked in priority order.
-_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
-    ("tenancy", ("tenancy", "landlord", "tenant", "termination of tenancy", "rtb", "residential tenancies", "notice of termination", "lease")),
-    ("medical_bill", ("hospital", "patient", "invoice", "amount due", "medical", "consultant", "outpatient")),
-    ("insurance", ("insurance", "policy", "premium", "insurer", "claim number", "cover")),
-    ("gov_letter", ("revenue", "department of", "social welfare", "gov.ie", "pps number", "citizens information")),
-]
+DocType = Literal["tenancy", "insurance", "medical_bill", "gov_letter", "other"]
 
 
-def _cue_matches(cue: str, text: str) -> bool:
-    """Whole-word (phrase) match so a cue can't fire on a substring —
-    e.g. the tenancy cue "lease" must not match inside "please"."""
-    return re.search(rf"\b{re.escape(cue)}\b", text) is not None
+def classify(text: str, jurisdiction: str | None = None) -> tuple[DocType, str]:
+    hint = (
+        f" The caller suggested jurisdiction {normalize_jurisdiction(jurisdiction)}."
+        if jurisdiction
+        else ""
+    )
+    try:
+        result = chat_json(
+            system=(
+                "Classify the official document. Detect jurisdiction as an ISO 3166-1 "
+                f"alpha-2 country code from addresses, legal bodies, and statutes.{hint} "
+                "Return JSON only: "
+                '{"doc_type": "tenancy|insurance|medical_bill|gov_letter|other", '
+                '"jurisdiction": "XX"}'
+            ),
+            user=text[:4000],
+            stage="classify",
+        )
+        doc_type = result.get("doc_type", "other")
+        if doc_type not in ("tenancy", "insurance", "medical_bill", "gov_letter", "other"):
+            doc_type = "other"
+        return doc_type, _resolve_jurisdiction(result.get("jurisdiction"), jurisdiction, text)
+    except Exception:
+        return _heuristic_classify(text, jurisdiction)
 
 
-def _heuristic_doc_type(text: str) -> str:
-    """Pick the doc_type with the most whole-word cue hits.
+def _resolve_jurisdiction(
+    detected: str | None,
+    hint: str | None,
+    text: str,
+) -> str:
+    if detected:
+        normalized = normalize_jurisdiction(detected)
+        if normalized:
+            return normalized
+    if hint:
+        normalized = normalize_jurisdiction(hint)
+        if normalized:
+            return normalized
+    inferred = infer_jurisdiction_from_text(text)
+    if inferred:
+        return inferred
+    return "UNK"
 
-    Scoring (rather than first-match-wins) stops a single weak/ambiguous cue
-    from outranking several strong ones — e.g. a lone "policy" in a footer must
-    not beat "department of" + "social welfare" + "gov.ie". Ties fall back to the
-    priority order in ``_KEYWORDS``.
-    """
-    low = text.lower()
-    best_type = "other"
-    best_score = 0
-    for doc_type, cues in _KEYWORDS:
-        score = sum(1 for cue in cues if _cue_matches(cue, low))
-        if score > best_score:
-            best_type, best_score = doc_type, score
-    return best_type
 
-
-def classify(text: str, demo: bool = False) -> tuple[str, str]:
-    if demo:
-        try:
-            f = load_fixture("classify_rtb_notice")
-            doc_type = f.get("doc_type", "other")
-            if doc_type not in DOC_TYPES:
-                doc_type = "other"
-            return doc_type, f.get("jurisdiction") or "IE"
-        except Exception:
-            return "other", "IE"
-
-    return _heuristic_doc_type(text), "IE"
+def _heuristic_classify(text: str, jurisdiction: str | None) -> tuple[DocType, str]:
+    place = _resolve_jurisdiction(None, jurisdiction, text)
+    lowered = text.lower()
+    if any(w in lowered for w in ("tenancy", "landlord", "rent", "rtb", "vacate")):
+        return "tenancy", place
+    if any(w in lowered for w in ("insurance", "policy", "premium", "claim")):
+        return "insurance", place
+    if any(w in lowered for w in ("hospital", "medical", "invoice", "treatment")):
+        return "medical_bill", place
+    if any(w in lowered for w in ("department", "minister", "revenue", "an post")):
+        return "gov_letter", place
+    return "other", place

@@ -2,6 +2,73 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Theme tokens. Tailwind's `stone` (neutral) and `indigo` (accent) scales read
+  these vars via rgb(var(--c-*) / <alpha-value>) — see tailwind.config.js.
+  Light values live on :root; "Ghost mode" swaps them under html.ghost.
+
+  Values are space-separated RGB channels so Tailwind's opacity utilities work.
+*/
+:root {
+  /* Neutrals — indigo tie-dye, light. */
+  --c-stone-50: 242 244 250;
+  --c-stone-100: 230 234 244; /* page background */
+  --c-stone-200: 210 216 234; /* borders */
+  --c-stone-300: 184 193 221;
+  --c-stone-400: 139 151 190; /* muted text */
+  --c-stone-500: 107 120 160;
+  --c-stone-600: 78 90 130;
+  --c-stone-700: 58 69 106;
+  --c-stone-800: 38 49 79;
+  --c-stone-900: 26 35 64; /* body text */
+  --c-stone-950: 16 26 46;
+
+  /* Accent — slate → steel → navy. */
+  --c-indigo-50: 238 241 249;
+  --c-indigo-100: 220 226 242;
+  --c-indigo-200: 199 206 226;
+  --c-indigo-300: 169 179 208;
+  --c-indigo-400: 96 118 168;
+  --c-indigo-500: 64 90 134;
+  --c-indigo-600: 51 73 122; /* primary button */
+  --c-indigo-700: 34 49 95; /* hover */
+  --c-indigo-800: 26 39 73;
+  --c-indigo-900: 19 29 56;
+  --c-indigo-950: 16 26 46;
+
+  --c-surface: 255 255 255; /* cards / inputs */
+}
+
+html.ghost {
+  /* Neutrals — flipped: low steps = dark surfaces, high steps = light text. */
+  --c-stone-50: 22 30 54; /* subtle elevated fill (inputs, hover) */
+  --c-stone-100: 11 17 34; /* page background — deep navy */
+  --c-stone-200: 40 52 82; /* borders */
+  --c-stone-300: 60 74 110;
+  --c-stone-400: 130 143 180; /* muted text */
+  --c-stone-500: 155 167 200;
+  --c-stone-600: 180 190 216;
+  --c-stone-700: 200 208 228;
+  --c-stone-800: 216 222 238;
+  --c-stone-900: 232 236 246; /* body text — pale periwinkle */
+  --c-stone-950: 244 246 252;
+
+  /* Accent — brighter blues that carry on dark surfaces. */
+  --c-indigo-50: 26 36 66;
+  --c-indigo-100: 32 45 82;
+  --c-indigo-200: 44 60 105;
+  --c-indigo-300: 70 92 145;
+  --c-indigo-400: 120 145 200;
+  --c-indigo-500: 90 120 190;
+  --c-indigo-600: 74 105 180; /* primary button */
+  --c-indigo-700: 99 130 205; /* hover — lighter on dark */
+  --c-indigo-800: 120 150 220;
+  --c-indigo-900: 150 175 235;
+  --c-indigo-950: 200 215 250;
+
+  --c-surface: 19 26 48; /* elevated navy card */
+}
+
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
@@ -16,12 +83,63 @@
       'Segoe UI',
       Roboto,
       sans-serif;
-    background-color: #f6f5f2;
-    color: #1a1a1a;
+    background-color: rgb(var(--c-stone-100));
+    color: rgb(var(--c-stone-900));
   }
 }
 
+/*
+  Ghost-mode treatment for semantic status tints (red mismatch, amber warning,
+  emerald ok). The light *-50/-100 tints would glare on dark, so remap them to
+  translucent dark fills with lightened text — keeping the mismatch card, the
+  centerpiece, clearly red but native to the dark theme.
+*/
 @layer utilities {
+  .ghost .bg-red-50,
+  .ghost .bg-red-50\/50,
+  .ghost .bg-red-50\/70,
+  .ghost .bg-red-100 {
+    background-color: rgb(239 68 68 / 0.14);
+  }
+  .ghost .bg-amber-50,
+  .ghost .bg-amber-50\/60,
+  .ghost .bg-amber-100,
+  .ghost .hover\:bg-amber-100:hover {
+    background-color: rgb(245 158 11 / 0.15);
+  }
+  .ghost .bg-emerald-100 {
+    background-color: rgb(16 185 129 / 0.18);
+  }
+
+  .ghost .border-red-200,
+  .ghost .border-red-300 {
+    border-color: rgb(239 68 68 / 0.45);
+  }
+  .ghost .border-amber-200,
+  .ghost .border-amber-300 {
+    border-color: rgb(245 158 11 / 0.45);
+  }
+  .ghost .ring-red-100 {
+    --tw-ring-color: rgb(239 68 68 / 0.25);
+  }
+  .ghost .ring-amber-200 {
+    --tw-ring-color: rgb(245 158 11 / 0.3);
+  }
+
+  .ghost .text-red-600,
+  .ghost .text-red-700,
+  .ghost .text-red-800,
+  .ghost .text-red-900 {
+    color: rgb(252 165 165);
+  }
+  .ghost .text-amber-800,
+  .ghost .text-amber-900 {
+    color: rgb(252 211 77);
+  }
+  .ghost .text-emerald-800 {
+    color: rgb(110 231 183);
+  }
+
   .receipt-quote {
     font-family: ui-monospace, Consolas, 'Courier New', monospace;
   }

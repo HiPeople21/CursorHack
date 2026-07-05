@@ -18,6 +18,7 @@ from app.schemas import (
     Action,
     Claim,
     DecodeRequest,
+    DecodeResponse,
     DecodeResult,
     ExtractedFact,
     Source,
@@ -135,16 +136,19 @@ def _document_to_result(doc: Document) -> DecodeResult:
     )
 
 
-@router.post("/decode", response_model=DecodeResult)
-def decode(request: DecodeRequest, db: Session = Depends(get_db)) -> DecodeResult:
-    result = run_decode(request.text, request.jurisdiction)
+@router.post("/decode", response_model=DecodeResponse)
+def decode(request: DecodeRequest, db: Session = Depends(get_db)) -> DecodeResponse:
+    outcome = run_decode(request.text, request.jurisdiction, request.institution)
 
-    doc = _persist(result, request.text)
+    if outcome.status != "complete" or outcome.result is None:
+        return outcome
+
+    doc = _persist(outcome.result, request.text)
     db.add(doc)
     db.commit()
     db.refresh(doc)
 
-    return result
+    return outcome
 
 
 @router.post("/decode/demo", response_model=DecodeResult)
@@ -157,7 +161,10 @@ def decode_demo(db: Session = Depends(get_db)) -> DecodeResult:
     are quoted from, so the returned facts keep their verbatim spans.
     """
     ingested = ingest_document(b"", "", "", demo=True)
-    result = run_decode(ingested.full_text_markdown, ingested.jurisdiction, demo=True)
+    outcome = run_decode(ingested.full_text_markdown, ingested.jurisdiction)
+    if outcome.result is None:
+        raise HTTPException(status_code=502, detail="Demo pipeline did not complete")
+    result = outcome.result
     result.doc_type = ingested.doc_type or result.doc_type
 
     doc = _persist(result, ingested.full_text_markdown)
@@ -203,7 +210,10 @@ async def decode_upload(
     except Exception as exc:  # noqa: BLE001 — surface a clean 422, not a 500
         raise HTTPException(status_code=422, detail=f"Could not read document: {exc}")
 
-    result = run_decode(ingested.full_text_markdown, jurisdiction)
+    outcome = run_decode(ingested.full_text_markdown, jurisdiction)
+    if outcome.result is None:
+        raise HTTPException(status_code=422, detail="Could not decode the uploaded document")
+    result = outcome.result
     # The vision ingest actually saw the document — trust its classification.
     result.doc_type = ingested.doc_type or result.doc_type
 

@@ -1,0 +1,52 @@
+{
+  "rtb": {
+    "display_name": "Residential Tenancies Board",
+    "jurisdiction": "IE",
+    "domains": ["rtb.ie", "citizensinformation.ie"],
+    "seed_urls": [
+      "https://www.citizensinformation.ie/en/housing/renting-a-home/tenants-and-landlords/ending-a-tenancy/"
+    ],
+    "doc_types": ["tenancy"],
+    "search_queries": [
+      "RTB notice period termination tenancy Ireland",
+      "minimum notice period ending tenancy Ireland"
+    ]
+  },
+  "citizens_information": {
+    "display_name": "Citizens Information",
+    "jurisdiction": "IE",
+    "domains": ["citizensinformation.ie"],
+    "seed_urls": [
+      "https://www.citizensinformation.ie/en/housing/renting-a-home/tenants-and-landlords/ending-a-tenancy/"
+    ],
+    "doc_types": ["tenancy", "gov_letter", "insurance", "medical_bill", "other"],
+    "search_queries": [
+      "Citizens Information housing tenancy rights Ireland"
+    ]
+  },
+  "tds": {
+    "display_name": "Tenancy Deposit Scheme",
+    "jurisdiction": "GB",
+    "domains": ["gov.uk", "tds.gb.com"],
+    "seed_urls": [
+      "https://www.gov.uk/tenancy-deposit-protection"
+    ],
+    "doc_types": ["tenancy"],
+    "search_queries": [
+      "Tenancy Deposit Scheme notice period England",
+      "ending tenancy notice period United Kingdom"
+    ]
+  },
+  "hmrc": {
+    "display_name": "HM Revenue and Customs",
+    "jurisdiction": "GB",
+    "domains": ["gov.uk"],
+    "seed_urls": [
+      "https://www.gov.uk/government/organisations/hm-revenue-customs"
+    ],
+    "doc_types": ["gov_letter", "other"],
+    "search_queries": [
+      "HMRC taxpayer rights United Kingdom"
+    ]
+  }
+}
