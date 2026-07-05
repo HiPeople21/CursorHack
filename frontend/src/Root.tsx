@@ -9,5 +9,5 @@ export default function Root() {
     return <LandingPage onGetStarted={() => setStarted(true)} />;
   }
 
-  return <App />;
+  return <App onHome={() => setStarted(false)} />;
 }

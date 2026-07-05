@@ -9,7 +9,11 @@ import { useSessions } from './hooks/useSessions';
 import { useDecodeRuns } from './hooks/useDecodeRuns';
 import { useTheme } from './hooks/useTheme';
 
-function App() {
+interface AppProps {
+  onHome?: () => void;
+}
+
+function App({ onHome }: AppProps) {
   const {
     sessions,
     active,
@@ -76,6 +80,7 @@ function App() {
         onCreate={create}
         onDelete={remove}
         onRename={rename}
+        onHome={onHome}
         onOpenProfile={() => setProfileOpen(true)}
         profileName={profile?.full_name ?? null}
         loadingIds={loadingIds}

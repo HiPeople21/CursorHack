@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Session } from '../types';
-import Logo from './Logo';
 
 interface SidebarProps {
   sessions: Session[];
@@ -9,12 +8,18 @@ interface SidebarProps {
   onCreate: () => void;
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
+  onHome?: () => void;
   onOpenProfile: () => void;
   profileName: string | null;
   loadingIds: string[];
   isGhost: boolean;
   onToggleTheme: () => void;
 }
+
+const SIDEBAR_WIDTH_KEY = 'reywal.sidebarWidth';
+const MIN_WIDTH = 208;
+const MAX_WIDTH = 460;
+const DEFAULT_WIDTH = 256;
 
 interface ContextMenu {
   id: string;
@@ -38,6 +43,7 @@ export default function Sidebar({
   onCreate,
   onDelete,
   onRename,
+  onHome,
   onOpenProfile,
   profileName,
   loadingIds,
@@ -49,6 +55,43 @@ export default function Sidebar({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Resizable width, persisted across sessions.
+  const [width, setWidth] = useState(() => {
+    const stored = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
+    return stored >= MIN_WIDTH && stored <= MAX_WIDTH ? stored : DEFAULT_WIDTH;
+  });
+  const resizing = useRef(false);
+
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(width));
+  }, [width]);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!resizing.current) return;
+      setWidth(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, e.clientX)));
+    };
+    const stop = () => {
+      if (!resizing.current) return;
+      resizing.current = false;
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', stop);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', stop);
+    };
+  }, []);
+
+  function startResize(e: React.MouseEvent) {
+    e.preventDefault();
+    resizing.current = true;
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+  }
 
   // Close the context menu on any outside click, scroll, or Escape.
   useEffect(() => {
@@ -91,11 +134,45 @@ export default function Sidebar({
   }
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-stone-200 bg-surface">
-      {/* Brand */}
+    <aside
+      style={{ width }}
+      className="relative flex h-screen shrink-0 flex-col border-r border-stone-200 bg-surface"
+    >
+      {/* Brand — click the icon to go back to the homepage */}
       <div className="px-4 py-4">
-        <Logo size="sm" />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onHome}
+            title="Back to homepage"
+            aria-label="Back to homepage"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition hover:bg-stone-100"
+          >
+            <img
+              src="/reywal-mark.png"
+              alt=""
+              aria-hidden
+              draggable={false}
+              className="block h-8 w-8 object-contain"
+            />
+          </button>
+          <img
+            src="/reywal-wordmark.png"
+            alt="Reywal"
+            draggable={false}
+            className="block h-[14px] w-auto translate-y-px"
+          />
+        </div>
       </div>
+
+      {/* Drag handle to resize the sidebar */}
+      <div
+        onMouseDown={startResize}
+        role="separator"
+        aria-orientation="vertical"
+        title="Drag to resize"
+        className="absolute right-0 top-0 z-20 h-full w-1.5 cursor-col-resize transition-colors hover:bg-indigo-400/50"
+      />
 
       {/* New document */}
       <div className="px-3">
