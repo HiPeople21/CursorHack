@@ -8,17 +8,25 @@ from app.pipeline.classify import classify
 from app.pipeline.extract import extract
 from app.pipeline.ground import ground
 from app.pipeline.identify import identify_bodies
+from app.pipeline.institution_resolve import (
+    build_institution_prompt,
+    institution_from_user_input,
+)
 from app.pipeline.retrieve import retrieve
 from app.pipeline.verify import verify
-from app.schemas import DecodeResult
+from app.schemas import DecodeResponse, DecodeResult, UserProvidedInstitution
 
 logger = logging.getLogger(__name__)
 
 DISCLAIMER = "Information, not legal advice."
 
 
-def run_decode(text: str, jurisdiction: str = "IE") -> DecodeResult:
-    """Run the full decode pipeline with graceful degradation per stage."""
+def run_decode(
+    text: str,
+    jurisdiction: str = "IE",
+    institution: UserProvidedInstitution | None = None,
+) -> DecodeResponse:
+    """Run the decode pipeline with graceful degradation per stage."""
     doc_type = "other"
     resolved_jurisdiction = jurisdiction or "IE"
     bodies = []
@@ -37,6 +45,20 @@ def run_decode(text: str, jurisdiction: str = "IE") -> DecodeResult:
         bodies = identify_bodies(text, doc_type, resolved_jurisdiction)
     except Exception:
         logger.exception("identify_bodies failed")
+
+    if not bodies:
+        if institution is None:
+            return DecodeResponse(
+                status="needs_institution",
+                institution_prompt=build_institution_prompt(doc_type, resolved_jurisdiction),
+            )
+        try:
+            bodies = [institution_from_user_input(institution, resolved_jurisdiction)]
+        except ValueError:
+            return DecodeResponse(
+                status="needs_institution",
+                institution_prompt=build_institution_prompt(doc_type, resolved_jurisdiction),
+            )
 
     try:
         facts, plain_summary = extract(text, doc_type)
@@ -65,14 +87,17 @@ def run_decode(text: str, jurisdiction: str = "IE") -> DecodeResult:
     except Exception:
         logger.exception("act failed")
 
-    return DecodeResult(
-        id=str(uuid.uuid4()),
-        doc_type=doc_type,
-        jurisdiction=resolved_jurisdiction,
-        plain_summary=plain_summary,
-        extracted_facts=facts,
-        claims=claims,
-        verification=verifications,
-        actions=actions,
-        disclaimer=DISCLAIMER,
+    return DecodeResponse(
+        status="complete",
+        result=DecodeResult(
+            id=str(uuid.uuid4()),
+            doc_type=doc_type,
+            jurisdiction=resolved_jurisdiction,
+            plain_summary=plain_summary,
+            extracted_facts=facts,
+            claims=claims,
+            verification=verifications,
+            actions=actions,
+            disclaimer=DISCLAIMER,
+        ),
     )

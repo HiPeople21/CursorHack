@@ -12,7 +12,7 @@ class IdentifiedBody(BaseModel):
     jurisdiction: Optional[str] = None  # ISO code; defaults to pipeline jurisdiction
     source_span: Optional[str] = None
     match_kind: Literal[
-        "letterhead", "signature", "reference", "explicit", "inferred"
+        "letterhead", "signature", "reference", "explicit", "inferred", "user_provided"
     ]
 
 

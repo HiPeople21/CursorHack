@@ -36,6 +36,15 @@ def get_body(body_id: str) -> Optional[BodyEntry]:
     return _load_registry().get(body_id)
 
 
+def get_bodies_for_jurisdiction(jurisdiction: str) -> list[tuple[str, BodyEntry]]:
+    """Return all registry entries for a jurisdiction."""
+    results: list[tuple[str, BodyEntry]] = []
+    for body_id, entry in _load_registry().items():
+        if entry.jurisdiction == jurisdiction:
+            results.append((body_id, entry))
+    return results
+
+
 def get_bodies_for_doc_type(doc_type: str, jurisdiction: str = "IE") -> list[tuple[str, BodyEntry]]:
     """Return registry entries whose doc_types include doc_type and jurisdiction matches."""
     results: list[tuple[str, BodyEntry]] = []

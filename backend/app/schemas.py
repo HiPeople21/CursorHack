@@ -58,6 +58,31 @@ class DecodeResult(BaseModel):
 class DecodeRequest(BaseModel):
     text: str
     jurisdiction: str = "IE"
+    institution: Optional["UserProvidedInstitution"] = None
+
+
+class UserProvidedInstitution(BaseModel):
+    """Supplied by the user when automatic institution identification fails."""
+
+    body_id: Optional[str] = None  # registry slug, e.g. rtb or IE:rtb
+    display_name: Optional[str] = None  # free text when slug is unknown
+
+
+class InstitutionSuggestion(BaseModel):
+    body_id: str
+    display_name: str
+
+
+class InstitutionPrompt(BaseModel):
+    message: str
+    field: str = "institution"
+    suggestions: list[InstitutionSuggestion] = []
+
+
+class DecodeResponse(BaseModel):
+    status: Literal["complete", "needs_institution"]
+    institution_prompt: Optional[InstitutionPrompt] = None
+    result: Optional[DecodeResult] = None
 
 
 # --- Profile (autofill) — not part of the frozen DecodeResult contract ---
