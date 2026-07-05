@@ -1,5 +1,6 @@
 """FastAPI app entry point: CORS, router wiring, startup table creation, health."""
 
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -7,6 +8,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
 from app.db import Base, engine  # noqa: E402  (import after load_dotenv)
 from app.routers import decode  # noqa: E402

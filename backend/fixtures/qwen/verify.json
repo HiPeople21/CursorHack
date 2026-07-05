@@ -1,0 +1,20 @@
+{
+  "verifications": [
+    {
+      "assertion": "Notice gives 14 days to vacate the property",
+      "passage_index": 0,
+      "quote": "notice period of 90 days where the tenancy has lasted 3 years or more",
+      "rule_value": "90 days minimum notice for a tenancy of 3 years or more",
+      "verdict": "mismatch",
+      "explanation": "The tenancy began in March 2021, so by the notice date it had lasted more than 3 years. Irish law requires a minimum of 90 days' notice for a tenancy of that length, but this notice gives only 14 days."
+    }
+  ],
+  "claims": [
+    {
+      "statement": "Tenancies that have lasted 3 years or more require a minimum of 90 days' notice under Irish law.",
+      "passage_index": 0,
+      "quote": "notice period of 90 days where the tenancy has lasted 3 years or more",
+      "status": "contradicted"
+    }
+  ]
+}

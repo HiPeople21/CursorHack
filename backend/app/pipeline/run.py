@@ -1,112 +1,103 @@
 """Pipeline entry point.
 
-STUB — the real implementation (classify/extract/retrieve/ground/verify/act)
-belongs to the pipeline-engineer. This stub returns a fully-populated,
-schema-valid DecodeResult built from a hardcoded example (the "money demo":
-a defective RTB termination notice) so the /api/decode endpoint is
-testable end-to-end immediately.
+Chains the six stages (classify -> extract -> retrieve -> ground -> verify ->
+act) plus a small summarize helper into one DecodeResult. Every stage is
+individually try/excepted: a failure in any single stage degrades that part
+of the result to an empty/safe value rather than raising, so `run_decode`
+always returns a schema-valid (if partial) DecodeResult.
 
 Signature is frozen per CLAUDE.md: run_decode(text, jurisdiction) -> DecodeResult
 """
 
-import uuid
-from datetime import datetime, timezone
+from __future__ import annotations
 
+import logging
+import uuid
+
+from app.pipeline import act as act_stage
+from app.pipeline import classify as classify_stage
+from app.pipeline import extract as extract_stage
+from app.pipeline import ground as ground_stage
+from app.pipeline import retrieve as retrieve_stage
+from app.pipeline import summarize as summarize_stage
+from app.pipeline import verify as verify_stage
 from app.schemas import (
     Action,
     Claim,
     DecodeResult,
     ExtractedFact,
-    Source,
     Verification,
 )
 
+logger = logging.getLogger(__name__)
+
+DISCLAIMER = "Information, not legal advice."
+
 
 def run_decode(text: str, jurisdiction: str = "IE") -> DecodeResult:
-    """Stub implementation — replace with the real 6-stage pipeline.
+    """Run the full six-stage decode pipeline.
 
-    Currently ignores `text`/`jurisdiction` content and always returns the
-    canned defective-notice example so downstream (routers, frontend) can be
-    built and tested against a realistic, fully-populated shape.
+    Resilient by design: each stage is isolated in its own try/except so a
+    failure anywhere (bad model output, network error, empty search results)
+    degrades that piece of the result to empty/safe defaults instead of
+    aborting the whole request. The endpoint always gets back a schema-valid
+    DecodeResult.
     """
-    retrieved_at = datetime.now(timezone.utc).isoformat()
+    result_id = str(uuid.uuid4())
+    juris = (jurisdiction or "IE").strip() or "IE"
 
-    rtb_source = Source(
-        url="https://www.citizensinformation.ie/en/housing/renting-a-home/tenants-and-landlords/ending-a-tenancy/",
-        title="Ending a tenancy - Citizens Information",
-        quote="notice period of 90 days where the tenancy has lasted 3 years or more",
-        retrieved_at=retrieved_at,
-    )
+    doc_type = "other"
+    try:
+        doc_type, juris = classify_stage.classify(text, default_jurisdiction=juris)
+    except Exception:
+        logger.exception("classify stage failed; defaulting doc_type=other")
+
+    facts: list[ExtractedFact] = []
+    try:
+        facts = extract_stage.extract(text, doc_type)
+    except Exception:
+        logger.exception("extract stage failed; continuing with no facts")
+
+    urls: list[dict[str, str]] = []
+    try:
+        urls = retrieve_stage.retrieve(doc_type, facts, juris)
+    except Exception:
+        logger.exception("retrieve stage failed; continuing with no candidate URLs")
+
+    passages: list[dict[str, str]] = []
+    try:
+        passages = ground_stage.ground(urls)
+    except Exception:
+        logger.exception("ground stage failed; continuing with no grounded passages")
+
+    claims: list[Claim] = []
+    verifications: list[Verification] = []
+    try:
+        claims, verifications = verify_stage.verify(doc_type, facts, passages)
+    except Exception:
+        logger.exception("verify stage failed; continuing with no claims/verifications")
+
+    actions: list[Action] = []
+    try:
+        actions = act_stage.act(doc_type, facts, verifications, juris)
+    except Exception:
+        logger.exception("act stage failed; continuing with no actions")
+
+    plain_summary = ""
+    try:
+        plain_summary = summarize_stage.summarize(text, doc_type, facts)
+    except Exception:
+        logger.exception("summarize helper failed; using generic summary")
+        plain_summary = "We could not automatically generate a plain-language summary for this document."
 
     return DecodeResult(
-        id=str(uuid.uuid4()),
-        doc_type="tenancy",
-        jurisdiction=jurisdiction or "IE",
-        plain_summary=(
-            "This is a termination notice from your landlord ending your "
-            "tenancy. It states you must leave within 14 days, but the "
-            "notice period it gives appears shorter than the legal minimum "
-            "for a tenancy of your length."
-        ),
-        extracted_facts=[
-            ExtractedFact(
-                key="notice_period_days",
-                value="14",
-                span="you are required to vacate the property within 14 days",
-            ),
-            ExtractedFact(
-                key="tenancy_start",
-                value="2021-03-01",
-                span="tenancy commencing 1 March 2021",
-            ),
-        ],
-        claims=[
-            Claim(
-                statement="The landlord issued a termination notice giving 14 days to vacate.",
-                status="supported",
-                source=None,
-            ),
-            Claim(
-                statement="Tenancies of 3+ years require 90 days' notice in Ireland.",
-                status="contradicted",
-                source=rtb_source,
-            ),
-        ],
-        verification=[
-            Verification(
-                assertion="14 days to vacate",
-                rule_value="90 days minimum (tenancy of 3+ years)",
-                verdict="mismatch",
-                explanation=(
-                    "For a tenancy that has lasted 3 years or more, Irish "
-                    "law (RTB) requires a minimum notice period of 90 days. "
-                    "This notice gives only 14, well short of the statutory "
-                    "minimum."
-                ),
-                source=rtb_source,
-            )
-        ],
-        actions=[
-            Action(
-                title="Appeal letter to landlord",
-                kind="letter",
-                body=(
-                    "I am writing regarding the Notice of Termination dated "
-                    "[DATE]. Under the Residential Tenancies Act, a tenancy "
-                    "of my duration requires a minimum notice period of 90 "
-                    "days, not the 14 days stated. As such, this notice is "
-                    "invalid and I am not required to vacate on the date "
-                    "given. I reserve my right to remain in the property "
-                    "and to refer this matter to the RTB if necessary."
-                ),
-                deadline=None,
-            ),
-            Action(
-                title="Respond before purported vacate date",
-                kind="deadline",
-                body="Notice states you must leave within 14 days of receipt.",
-                deadline=None,
-            ),
-        ],
-        disclaimer="Information, not legal advice.",
+        id=result_id,
+        doc_type=doc_type,
+        jurisdiction=juris,
+        plain_summary=plain_summary,
+        extracted_facts=facts,
+        claims=claims,
+        verification=verifications,
+        actions=actions,
+        disclaimer=DISCLAIMER,
     )
