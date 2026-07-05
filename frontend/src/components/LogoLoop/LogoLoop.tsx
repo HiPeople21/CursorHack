@@ -17,6 +17,8 @@ export type LogoItem =
       sizes?: string;
       width?: number;
       height?: number;
+      /** When false, skip the white invert filter (for logos already light on dark). */
+      invert?: boolean;
     };
 
 export interface LogoLoopProps {
@@ -307,6 +309,7 @@ export const LogoLoop = React.memo<LogoLoopProps>(
           </span>
         ) : (
           <img
+            className={(item as { invert?: boolean }).invert === false ? undefined : 'logoloop__img--invert'}
             src={(item as any).src}
             srcSet={(item as any).srcSet}
             sizes={(item as any).sizes}
