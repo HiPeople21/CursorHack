@@ -9,7 +9,11 @@ import { useSessions } from './hooks/useSessions';
 import { useDecodeRuns } from './hooks/useDecodeRuns';
 import { useTheme } from './hooks/useTheme';
 
-function App() {
+interface AppProps {
+  onGoHome: () => void;
+}
+
+function App({ onGoHome }: AppProps) {
   const {
     sessions,
     active,
@@ -73,6 +77,7 @@ function App() {
       <Sidebar
         sessions={sessions}
         activeId={activeId}
+        onLogoClick={onGoHome}
         onSelect={select}
         onCreate={create}
         onDelete={remove}

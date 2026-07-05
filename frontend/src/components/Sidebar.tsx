@@ -5,6 +5,7 @@ import Logo from './Logo';
 interface SidebarProps {
   sessions: Session[];
   activeId: string;
+  onLogoClick: () => void;
   onSelect: (id: string) => void;
   onCreate: () => void;
   onDelete: (id: string) => void;
@@ -34,6 +35,7 @@ function verdictDot(session: Session): string {
 export default function Sidebar({
   sessions,
   activeId,
+  onLogoClick,
   onSelect,
   onCreate,
   onDelete,
@@ -94,7 +96,14 @@ export default function Sidebar({
     <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-stone-200 bg-surface">
       {/* Brand */}
       <div className="px-4 py-4">
-        <Logo size="sm" />
+        <button
+          type="button"
+          onClick={onLogoClick}
+          aria-label="Go to home page"
+          className="rounded-lg transition hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+        >
+          <Logo size="sm" />
+        </button>
       </div>
 
       {/* New document */}
