@@ -4,39 +4,50 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Foggy-forest palette (creativerootsblog.com reference).
+        // Indigo tie-dye palette (fabmood.com reference).
         // We remap the two families the app already uses — `stone` (neutrals)
         // and `indigo` (accent/brand) — so every component adopts the palette.
 
-        // Neutrals: cool green-grey mist. Page bg -> mist, text -> forest.
+        // Neutrals: cool blue-greys. Page bg -> periwinkle, text -> navy.
         stone: {
-          50: '#f4f7f6',
-          100: '#e6edec', // page background
-          200: '#d3dcdb', // borders / hairlines
-          300: '#b6c3c3',
-          400: '#8fa1ab', // slate mist — muted text (swatch 5)
-          500: '#6b7a7c',
-          600: '#4f5d54',
-          700: '#3a4a37',
-          800: '#2a3626',
-          900: '#1f2a1b', // body text
-          950: '#141c11',
+          50: '#f2f4fa',
+          100: '#e6eaf4', // page background
+          200: '#d2d8ea', // borders / hairlines
+          300: '#b8c1dd',
+          400: '#8b97be', // muted text
+          500: '#6b78a0',
+          600: '#4e5a82',
+          700: '#3a456a',
+          800: '#26314f',
+          900: '#1a2340', // body text
+          950: '#101a2e', // near-black navy (swatch 6)
         },
 
-        // Accent/brand: moss & forest greens.
+        // Accent/brand: slate -> steel -> navy blues.
         indigo: {
-          50: '#eef2e6',
-          100: '#dde6cc',
-          200: '#c1d09f',
-          300: '#a2b184', // sage (swatch 4)
-          400: '#829e52',
-          500: '#5c6e3a', // moss (swatch 3) — accent
-          600: '#4a5a2e', // primary button
-          700: '#3a4724', // hover
-          800: '#2f3d24', // dark forest (swatch 2)
-          900: '#24301c',
-          950: '#1b2416', // near-black green (swatch 1)
+          50: '#eef1f9',
+          100: '#dce2f2',
+          200: '#c7cee2', // light periwinkle (swatch 1)
+          300: '#a9b3d0', // periwinkle-grey (swatch 2)
+          400: '#6076a8', // slate blue (swatch 3)
+          500: '#405a86', // steel blue (swatch 4)
+          600: '#33497a', // primary button
+          700: '#22315f', // navy (swatch 5) — hover
+          800: '#1a2749',
+          900: '#131d38',
+          950: '#101a2e', // near-black navy (swatch 6)
         },
+      },
+
+      // Sharper boxes: crisp corners across the app. `full` is left untouched
+      // so status dots, the avatar, and spinners stay round.
+      borderRadius: {
+        DEFAULT: '0.125rem', // 2px
+        md: '0.125rem', // 2px
+        lg: '0.1875rem', // 3px
+        xl: '0.25rem', // 4px
+        '2xl': '0.25rem', // 4px
+        '3xl': '0.375rem', // 6px
       },
     },
   },
