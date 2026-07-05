@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import type {
+  DecodeProgressEvent,
   DecodeResult,
   InstitutionPrompt,
   UserProvidedInstitution,
 } from '../types';
-import { decode } from '../api/client';
+import { decodeStream } from '../api/client';
+import ThinkingPanel from './ThinkingPanel';
 
 interface PasteBoxProps {
   text: string;
@@ -45,13 +47,20 @@ export default function PasteBox({
   const [error, setError] = useState<string | null>(null);
   const [prompt, setPrompt] = useState<InstitutionPrompt | null>(null);
   const [institutionText, setInstitutionText] = useState('');
+  const [events, setEvents] = useState<DecodeProgressEvent[]>([]);
 
   async function submit(institution?: UserProvidedInstitution | null) {
     if (!text.trim() || loading) return;
     setLoading(true);
     setError(null);
+    setEvents([]);
     try {
-      const response = await decode(text, jurisdiction || undefined, institution);
+      const response = await decodeStream(
+        text,
+        (event) => setEvents((prev) => [...prev, event]),
+        jurisdiction || undefined,
+        institution
+      );
       if (response.status === 'needs_institution') {
         setPrompt(response.institution_prompt);
         return;
@@ -151,6 +160,8 @@ export default function PasteBox({
           {loading ? 'Checking against the rules...' : 'Decode this document'}
         </button>
       </div>
+
+      {events.length > 0 && <ThinkingPanel events={events} active={loading} />}
 
       {prompt && (
         <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4">

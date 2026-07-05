@@ -1,6 +1,9 @@
 """POST /api/decode and the history GET endpoints."""
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -12,7 +15,7 @@ from app.models import (
     SourceRow,
     VerificationRow,
 )
-from app.pipeline.run import run_decode
+from app.pipeline.run import run_decode, run_decode_stream
 from app.schemas import (
     Action,
     Claim,
@@ -148,6 +151,49 @@ def decode(request: DecodeRequest, db: Session = Depends(get_db)) -> DecodeRespo
     db.refresh(doc)
 
     return outcome
+
+
+@router.post("/decode/stream")
+def decode_stream(request: DecodeRequest, db: Session = Depends(get_db)) -> StreamingResponse:
+    """Server-Sent Events variant of /decode.
+
+    Emits one JSON frame per pipeline stage so the client can show progress in
+    real time, then a terminal frame carrying the full DecodeResponse. The
+    completed result is persisted before the terminal frame is sent, matching
+    the behaviour of the blocking /decode endpoint.
+    """
+
+    def event_stream():
+        for event in run_decode_stream(
+            request.text, request.jurisdiction, request.institution
+        ):
+            response: DecodeResponse | None = event.get("response")
+            if response is not None:
+                if response.status == "complete" and response.result is not None:
+                    try:
+                        doc = _persist(response.result, request.text)
+                        db.add(doc)
+                        db.commit()
+                    except Exception:
+                        db.rollback()
+                frame = {
+                    "stage": event["stage"],
+                    "status": event["status"],
+                    "response": response.model_dump(),
+                }
+            else:
+                frame = event
+            yield f"data: {json.dumps(frame)}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/documents", response_model=list[DecodeResult])
