@@ -1,7 +1,5 @@
 """FastAPI app entry point: CORS, router wiring, startup table creation, health."""
 
-import os
-
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,5 +30,5 @@ def on_startup() -> None:
 
 @app.get("/api/health")
 def health() -> dict:
-    demo_mode = os.getenv("DEMO_MODE", "1") == "1"
-    return {"status": "ok", "demo_mode": demo_mode}
+    # Demo is no longer a global mode — it's the POST /api/decode/demo endpoint.
+    return {"status": "ok", "demo_endpoint": "/api/decode/demo"}

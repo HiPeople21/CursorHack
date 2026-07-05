@@ -1,17 +1,26 @@
 """Pipeline entry point.
 
-STUB — the real implementation (classify/extract/retrieve/ground/verify/act)
-belongs to the pipeline-engineer. This stub returns a fully-populated,
-schema-valid DecodeResult built from a hardcoded example (the "money demo":
-a defective RTB termination notice) so the /api/decode endpoint is
-testable end-to-end immediately.
+`run_decode(text, jurisdiction) -> DecodeResult` (signature frozen per CLAUDE.md).
 
-Signature is frozen per CLAUDE.md: run_decode(text, jurisdiction) -> DecodeResult
+This branch (`extraction-layer`) implements the front of the pipeline:
+**classify** and **extract** run for real over the document text, so
+`doc_type`, `jurisdiction`, and `extracted_facts` reflect the actual document
+that was pasted or uploaded. The downstream stages (retrieve/ground/verify/act)
+are not implemented yet — those belong to other branches.
+
+On the live path they stay empty (an honest partial result); the hardcoded
+"money demo" content is served ONLY by the demo path (`demo=True`, exposed via
+POST /api/decode/demo), never leaking into a real decode.
+
+Every real stage is wrapped so any failure degrades gracefully; a single flaky
+call never takes the endpoint down.
 """
 
 import uuid
 from datetime import datetime, timezone
 
+from app.pipeline.classify import classify
+from app.pipeline.extract import extract_facts
 from app.schemas import (
     Action,
     Claim,
@@ -22,12 +31,36 @@ from app.schemas import (
 )
 
 
-def run_decode(text: str, jurisdiction: str = "IE") -> DecodeResult:
-    """Stub implementation — replace with the real 6-stage pipeline.
+DISCLAIMER = "Information, not legal advice."
 
-    Currently ignores `text`/`jurisdiction` content and always returns the
-    canned defective-notice example so downstream (routers, frontend) can be
-    built and tested against a realistic, fully-populated shape.
+
+def _live_result(jurisdiction: str) -> DecodeResult:
+    """Base result for a real (non-demo) decode.
+
+    classify + extract fill in ``doc_type``, ``jurisdiction`` and
+    ``extracted_facts``. The downstream stages (retrieve/ground/verify/act) are
+    not implemented on this branch, so their fields stay empty rather than being
+    back-filled with canned money-demo content — a real decode must never claim
+    to have verified a document it never looked at.
+    """
+    return DecodeResult(
+        id=str(uuid.uuid4()),
+        doc_type="other",
+        jurisdiction=jurisdiction or "IE",
+        plain_summary="",
+        extracted_facts=[],
+        claims=[],
+        verification=[],
+        actions=[],
+        disclaimer=DISCLAIMER,
+    )
+
+
+def _stub_result(jurisdiction: str) -> DecodeResult:
+    """The canned defective-RTB-notice result — the offline "money demo" only.
+
+    Served by POST /api/decode/demo (``demo=True``). NOT used for the live
+    POST /api/decode path, which must reflect the actual pasted/uploaded doc.
     """
     retrieved_at = datetime.now(timezone.utc).isoformat()
 
@@ -108,5 +141,39 @@ def run_decode(text: str, jurisdiction: str = "IE") -> DecodeResult:
                 deadline=None,
             ),
         ],
-        disclaimer="Information, not legal advice.",
+        disclaimer=DISCLAIMER,
     )
+
+
+def run_decode(text: str, jurisdiction: str = "IE", demo: bool = False) -> DecodeResult:
+    """Chain the pipeline. classify + extract are real; the rest is still stubbed.
+
+    When ``demo`` is set the whole pipeline serves the canned "money demo"
+    fixtures (POST /api/decode/demo). Otherwise this is a live decode of the
+    actual document: classify + extract run for real and the unimplemented
+    downstream stages stay empty — we never back-fill with the canned RTB
+    content, so the result always reflects the document that was submitted.
+
+    Resilient: each real stage degrades gracefully on any error so a partial
+    result is always returned.
+    """
+    result = _stub_result(jurisdiction) if demo else _live_result(jurisdiction)
+
+    try:
+        doc_type, detected_jur = classify(text, demo=demo)
+        result.doc_type = doc_type
+        result.jurisdiction = jurisdiction or detected_jur or "IE"
+    except Exception:
+        pass  # keep the base doc_type/jurisdiction
+
+    try:
+        facts = extract_facts(text, result.doc_type, demo=demo)
+        if demo:
+            if facts:
+                result.extracted_facts = facts  # keep canned facts if fixture empty
+        else:
+            result.extracted_facts = facts
+    except Exception:
+        pass  # keep whatever the base provided
+
+    return result

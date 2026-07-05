@@ -5,3 +5,7 @@ pydantic
 python-dotenv
 openai
 httpx
+python-multipart
+pymupdf
+pillow
+pytesseract   # OCR; requires the `tesseract` system binary (macOS: brew install tesseract)

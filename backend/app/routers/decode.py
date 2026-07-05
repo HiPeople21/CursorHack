@@ -1,6 +1,6 @@
 """POST /api/decode and the history GET endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -12,6 +12,7 @@ from app.models import (
     SourceRow,
     VerificationRow,
 )
+from app.pipeline.ingest import ingest_document
 from app.pipeline.run import run_decode
 from app.schemas import (
     Action,
@@ -139,6 +140,74 @@ def decode(request: DecodeRequest, db: Session = Depends(get_db)) -> DecodeResul
     result = run_decode(request.text, request.jurisdiction)
 
     doc = _persist(result, request.text)
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+
+    return result
+
+
+@router.post("/decode/demo", response_model=DecodeResult)
+def decode_demo(db: Session = Depends(get_db)) -> DecodeResult:
+    """Offline "money demo": run the whole pipeline against the canned defective
+    RTB-notice fixtures — no network, no OCR binary, no request body. This is the
+    former DEMO_MODE, now an explicit endpoint instead of a global env flag.
+
+    Ingesting the fixture first gives us the exact source text the extract spans
+    are quoted from, so the returned facts keep their verbatim spans.
+    """
+    ingested = ingest_document(b"", "", "", demo=True)
+    result = run_decode(ingested.full_text_markdown, ingested.jurisdiction, demo=True)
+    result.doc_type = ingested.doc_type or result.doc_type
+
+    doc = _persist(result, ingested.full_text_markdown)
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+
+    return result
+
+
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
+_ALLOWED_EXTS = (".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".tif", ".tiff", ".bmp")
+
+
+@router.post("/decode/upload", response_model=DecodeResult)
+async def decode_upload(
+    file: UploadFile = File(...),
+    jurisdiction: str = Form("IE"),
+    db: Session = Depends(get_db),
+) -> DecodeResult:
+    """Upload an image or PDF of a document, ingest it to layout-preserving
+    markdown, then run the pipeline. Sibling of the JSON POST /api/decode."""
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file")
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File too large (max 20 MB)")
+
+    ctype = (file.content_type or "").lower()
+    fname = file.filename or ""
+    allowed = (
+        ctype == "application/pdf"
+        or ctype.startswith("image/")
+        or fname.lower().endswith(_ALLOWED_EXTS)
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=415, detail=f"Unsupported file type: {ctype or fname or 'unknown'}"
+        )
+
+    try:
+        ingested = ingest_document(data, fname, ctype)
+    except Exception as exc:  # noqa: BLE001 — surface a clean 422, not a 500
+        raise HTTPException(status_code=422, detail=f"Could not read document: {exc}")
+
+    result = run_decode(ingested.full_text_markdown, jurisdiction)
+    # The vision ingest actually saw the document — trust its classification.
+    result.doc_type = ingested.doc_type or result.doc_type
+
+    doc = _persist(result, ingested.full_text_markdown)
     db.add(doc)
     db.commit()
     db.refresh(doc)
