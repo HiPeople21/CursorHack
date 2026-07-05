@@ -22,6 +22,12 @@ export function useTheme() {
     root.classList.toggle('ghost', theme === 'ghost');
     root.classList.toggle('dark', theme === 'ghost'); // for Tailwind dark: variants
     localStorage.setItem(STORAGE_KEY, theme);
+    // On unmount (e.g. navigating back to the landing page) drop the theme
+    // classes so the landing is never rendered in Ghost mode. The saved
+    // preference stays in localStorage and is restored on re-entering the app.
+    return () => {
+      root.classList.remove('ghost', 'dark');
+    };
   }, [theme]);
 
   const toggle = useCallback(
